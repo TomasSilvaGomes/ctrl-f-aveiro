@@ -33,6 +33,7 @@ from evaluate import load_jsonl, matches  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 OSM_TO_OURS = {"ecoponto": "ilha_reciclagem", "indiferenciado": "indiferenciado",
                "subterraneo": "subterraneo"}
+RECYCLING_FRACTIONS = {"ecoponto_papel", "ecoponto_embalagens", "ecoponto_vidro"}
 
 
 def mapillary_to_subtype(tax):
@@ -79,7 +80,10 @@ def main():
         tax = yaml.safe_load(f)
     to_sub = mapillary_to_subtype(tax)
     sign_ids = [s["id"] for s in tax["categorias"]["sinalizacao"]["subtipos"]]
-    bin_ids = [s["id"] for s in tax["categorias"]["residuos"]["subtipos"]]
+    bin_ids = [
+        s["id"] for s in tax["categorias"]["residuos"]["subtipos"]
+        if s["id"] not in RECYCLING_FRACTIONS
+    ]
 
     with open(DATA_DIR / "meta" / "sample_images.csv", encoding="utf-8") as f:
         imgs = {r["id"]: r for r in csv.DictReader(f)}
@@ -139,7 +143,8 @@ def main():
                 if dist < bd:
                     best, bd = sub, dist
             if best:
-                conf_b[(best, d["subtype"])] += 1
+                pred_sub = "ilha_reciclagem" if d["subtype"] in RECYCLING_FRACTIONS else d["subtype"]
+                conf_b[(best, pred_sub)] += 1
     table(conf_b, bin_ids, f"RESÍDUOS — subclasse vs contentor OSM mais próximo (<= {args.osm_m:.0f} m)")
 
 

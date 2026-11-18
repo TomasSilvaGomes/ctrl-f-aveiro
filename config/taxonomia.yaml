@@ -17,12 +17,19 @@
 # categoria; o subtipo é decidido depois pelo SigLIP (prompts de cada subtipo).
 # Escolha das frases: scripts/escolhe_prompts.py.
 detetor:
-  sinalizacao: ["a traffic sign", "a stop sign", "a yield sign", "a speed limit sign"]
+  sinalizacao: ["a traffic sign", "a stop sign", "a yield sign", "a speed limit sign",
+                "a red circular no entry road sign with a horizontal white bar",
+                "a blue pedestrian crossing road sign showing a person on a zebra crossing"]
+  semaforos: ["a traffic light", "a road traffic signal", "traffic lights at an intersection"]
   # Escolhidas por escolhe_prompts.py (17/11). Iluminação encontrada, rua seguida / outra rua:
   #   "a lamp"+"a utility pole" 21% / 7% · "a street light"+"a lamp post" 50% / 60% · estas 50% / 62%
-  iluminacao: ["a decorative street lamp", "a wall-mounted street lamp", "an ornamental street lamp", "a lamppost"]
+  iluminacao: ["a decorative street lamp", "a wall-mounted street lamp", "an ornamental street lamp",
+               "a lamppost", "a tall street light pole with an arm and lamp head"]
   # Contentores: as frases CCAS não ganharam (53% vs 51% numa rua, 18% vs 20% na outra) -> ficam estas.
-  residuos: ["a trash bin", "a waste container", "a recycling container"]
+  residuos: ["a trash bin", "a waste container", "a recycling container",
+             "a blue recycling container for paper and cardboard",
+             "a yellow recycling container for packaging",
+             "a green glass recycling container"]
 
 categorias:
   sinalizacao:
@@ -131,19 +138,37 @@ categorias:
 
   residuos:
     label: Resíduos
-    # Só 3 tipos (ficha do desafio): ilha de reciclagem (ecoponto), indiferenciado,
-    # subterrâneo. O tipo vem só do SigLIP (sem regras de cor nem frações).
+    # As frações dos ecopontos são classificadas pelo SigLIP; quando não forem
+    # distinguíveis, mantém-se o subtipo genérico ilha_reciclagem.
     # Papeleiras não são pedidas: estão nos negativos (descartadas).
     # Frases CCAS testadas a 17/11 e rejeitadas (auditoria 72% vs 89%: deixavam passar
     # papeleiras) -> ficam estas.
     # A Mapillary só tem "object--trash-can" (sem tipo).
     subtipos:
       - id: ilha_reciclagem
-        label: Ilha de reciclagem (ecoponto)
+        label: Ecoponto (fração não identificada)
         codigo: amenity=recycling
         mapillary: []
-        prompts: ["a large dark blue plastic recycling bell container with a coloured opening",
-                  "dark blue recycling containers with yellow, green and blue openings"]
+        prompts: ["a group of recycling containers with blue, yellow and green bins",
+                  "a recycling station made up of several coloured bins"]
+      - id: ecoponto_papel
+        label: Ecoponto azul (papel/cartão)
+        codigo: amenity=recycling
+        mapillary: []
+        prompts: ["a blue recycling container for paper and cardboard",
+                  "a blue recycling bell container for paper waste"]
+      - id: ecoponto_embalagens
+        label: Ecoponto amarelo (embalagens)
+        codigo: amenity=recycling
+        mapillary: []
+        prompts: ["a yellow recycling container for plastic packaging",
+                  "a yellow recycling bell container for packaging"]
+      - id: ecoponto_vidro
+        label: Ecoponto verde (vidro)
+        codigo: amenity=recycling
+        mapillary: []
+        prompts: ["a green glass recycling container",
+                  "a green recycling bell container for glass bottles"]
       - id: indiferenciado
         label: Contentor indiferenciado
         codigo: amenity=waste_disposal
@@ -172,13 +197,25 @@ categorias:
                   "a large round semi-underground waste container with wooden slat cladding and a black dome lid with a lifting ring",
                   "a large round grey semi-underground waste container with a dark dome lid"]
 
+  semaforos:
+    label: Semáforos
+    subtipos:
+      - id: semaforo
+        label: Semáforo
+        codigo: highway=traffic_signals
+        mapillary: ["object--traffic-light"]
+        prompts: ["a red yellow and green road traffic light",
+                  "a road traffic signal with red yellow and green lights",
+                  "traffic lights hanging over the road",
+                  "a traffic light on a pole"]
+
 # Catálogo: ecopontos próximos (vários "iglus" lado a lado) formam UMA ilha.
 agrupamentos:
   ilha_reciclagem:
     label: Ilha de reciclagem (ecoponto)
     codigo: amenity=recycling
     categoria: residuos
-    membros: [ilha_reciclagem]
+    membros: [ilha_reciclagem, ecoponto_papel, ecoponto_embalagens, ecoponto_vidro]
     raio_m: 8          # contentores a <= 8 m entre si formam uma ilha
     min_membros: 1
 
@@ -191,7 +228,6 @@ negativos:
   - "a car"
   - "a person"
   - "an advertising billboard"
-  - "a traffic light"
   - "empty sky"
   - "an electrical utility cabinet"
   - "a red fire hydrant"

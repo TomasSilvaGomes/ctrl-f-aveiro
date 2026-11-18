@@ -27,7 +27,7 @@ from collections import defaultdict
 sys.path.insert(0, os.path.dirname(__file__))
 from estimate_mapillary import DATA_DIR  # noqa: E402
 
-CATS = ["sinalizacao", "iluminacao", "residuos"]
+CATS = ["sinalizacao", "iluminacao", "residuos", "semaforos"]
 
 
 def iou(a, b):

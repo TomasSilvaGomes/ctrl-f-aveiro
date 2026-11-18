@@ -41,6 +41,8 @@ MLY_URL = "https://tiles.mapillary.com/maps/vtp/{tileset}/2/{z}/{x}/{y}?access_t
 def categorize_osm(tags: dict):
     """Mapeia tags OSM para (categoria, subtipo) do desafio, ou None."""
     hw, am = tags.get("highway"), tags.get("amenity")
+    if hw == "traffic_signals":
+        return "semaforos", "semaforo"
     if hw == "street_lamp":
         return "iluminacao", "candeeiro"
     if am == "recycling" and tags.get("recycling_type", "container") == "container":
@@ -59,6 +61,8 @@ def categorize_osm(tags: dict):
 
 
 def categorize_mly(value: str):
+    if value == "object--traffic-light":
+        return "semaforos", "semaforo"
     if value == "object--street-light":
         return "iluminacao", "candeeiro"
     if value in ("object--support--utility-pole", "object--support--pole"):
@@ -83,6 +87,7 @@ def fetch_osm(poly):
     area["boundary"="administrative"]["admin_level"="7"]["name"="Aveiro"]->.a;
     (
       node["highway"="street_lamp"](area.a);
+      node["highway"="traffic_signals"](area.a);
       nwr["amenity"="recycling"](area.a);
       nwr["amenity"="waste_disposal"](area.a);
       node["highway"="stop"](area.a);

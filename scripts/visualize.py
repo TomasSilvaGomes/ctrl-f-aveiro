@@ -24,7 +24,8 @@ from PIL import Image, ImageDraw, ImageFont
 sys.path.insert(0, os.path.dirname(__file__))
 from estimate_mapillary import DATA_DIR  # noqa: E402
 
-COLORS = {"sinalizacao": (230, 40, 40), "iluminacao": (255, 200, 0), "residuos": (40, 200, 70)}
+COLORS = {"sinalizacao": (230, 40, 40), "iluminacao": (255, 200, 0),
+          "residuos": (40, 200, 70), "semaforos": (0, 160, 255)}
 Image.MAX_IMAGE_PIXELS = None
 
 

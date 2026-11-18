@@ -1,0 +1,76 @@
+{
+  "imagem": "C:\\Users\\Utilizador\\Desktop\\2.png",
+  "modelo": "yolov8m-world.pt",
+  "classes": [
+    "Iluminação pública",
+    "Resíduos",
+    "Semáforos",
+    "Sinal"
+  ],
+  "prompts_tecnicos": [
+    "a traffic sign",
+    "a stop sign",
+    "a yield sign",
+    "a speed limit sign",
+    "a red circular no entry road sign with a horizontal white bar",
+    "a blue pedestrian crossing road sign showing a person on a zebra crossing",
+    "a traffic light",
+    "a road traffic signal",
+    "traffic lights at an intersection",
+    "a decorative street lamp",
+    "a wall-mounted street lamp",
+    "an ornamental street lamp",
+    "a lamppost",
+    "a tall street light pole with an arm and lamp head",
+    "a trash bin",
+    "a waste container",
+    "a recycling container",
+    "a blue recycling container for paper and cardboard",
+    "a yellow recycling container for packaging",
+    "a green glass recycling container"
+  ],
+  "deteccoes": [
+    {
+      "caixa": [
+        1322.6,
+        1146.5,
+        1575.1,
+        1579.5
+      ],
+      "confianca": 0.6816,
+      "categoria": "Iluminação pública",
+      "subtipo": "poste_iluminacao",
+      "rotulo": "Poste de luz",
+      "confianca_subtipo": 0.7658,
+      "prompt_tecnico": "a tall street light pole with an arm and lamp head"
+    },
+    {
+      "caixa": [
+        2145.2,
+        1596.5,
+        2273.6,
+        1763.8
+      ],
+      "confianca": 0.4542,
+      "categoria": "Resíduos",
+      "subtipo": "indiferenciado",
+      "rotulo": "Contentor indiferenciado",
+      "confianca_subtipo": 0.9825,
+      "prompt_tecnico": "a trash bin"
+    },
+    {
+      "caixa": [
+        556.9,
+        1362.4,
+        644.2,
+        1462.1
+      ],
+      "confianca": 0.2099,
+      "categoria": "Sinal",
+      "subtipo": "estacionamento",
+      "rotulo": "Sinal Estacionamento",
+      "confianca_subtipo": 0.9783,
+      "prompt_tecnico": "a traffic sign"
+    }
+  ]
+}

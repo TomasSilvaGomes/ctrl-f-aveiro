@@ -38,8 +38,9 @@ from evaluate_subtypes import mapillary_to_subtype  # noqa: E402
 from geolocate import MIN_CONTENTOR_M, box_width_m, project, reference_index, xy  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-CATS = ["sinalizacao", "iluminacao", "residuos"]
-NOMES = {"sinalizacao": "Sinais", "iluminacao": "Iluminação", "residuos": "Contentores"}
+CATS = ["sinalizacao", "iluminacao", "residuos", "semaforos"]
+NOMES = {"sinalizacao": "Sinais", "iluminacao": "Iluminação",
+         "residuos": "Contentores", "semaforos": "Semáforos"}
 
 
 # ------------------------------------------------------------------ formato

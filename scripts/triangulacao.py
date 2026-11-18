@@ -48,7 +48,8 @@ from build_catalog import cluster  # noqa: E402
 from estimate_mapillary import DATA_DIR  # noqa: E402
 from geolocate import reference_index, xy  # noqa: E402
 
-NOMES = {"sinalizacao": "Sinais", "iluminacao": "Iluminação", "residuos": "Contentores"}
+NOMES = {"sinalizacao": "Sinais", "iluminacao": "Iluminação",
+         "residuos": "Contentores", "semaforos": "Semáforos"}
 KX, KY = xy(1, 0)[0], xy(0, 1)[1]
 
 
@@ -199,7 +200,7 @@ def main():
 
     lines = ["# Triangulação multivista (piloto)", "",
              f"{sum(len(v) for v in groups.values())} deteções · {len(set(seq.values()))} passagens.", ""]
-    cats = ["sinalizacao", "iluminacao", "residuos"]
+    cats = ["sinalizacao", "iluminacao", "residuos", "semaforos"]
     tri = [o for o in objs if o["metodo"] == "triangulado"]
 
     # 1. quantos objetos ficaram triangulados

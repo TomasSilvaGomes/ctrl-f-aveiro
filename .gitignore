@@ -18,3 +18,5 @@ data/*/viz/
 data/**/*.antes*.jsonl
 data/piloto_*/ground_truth/*.geojson
 *.zip
+weights/
+*.pt

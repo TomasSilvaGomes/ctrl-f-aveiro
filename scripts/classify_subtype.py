@@ -4,8 +4,8 @@ recorte, usando a taxonomia em config/taxonomia.yaml. Se ganhar uma descrição
 "negativa" (árvore, fachada, ...) a deteção é descartada. O número dos limites
 de velocidade é lido a seguir, por scripts/ler_limites.py.
 
-Contentores: só 3 tipos (ilha de reciclagem, indiferenciado, subterrâneo),
-decididos só pelo SigLIP (sem regras de cor).
+Contentores: a ilha de reciclagem pode ser classificada por fração (azul/papel,
+amarelo/embalagens, verde/vidro); os restantes tipos são decididos pelo SigLIP.
 
 Entrada:  data/preds/<modelo>.jsonl         (saída do run_detector.py)
 Saída:    data/preds/<modelo>_classified.jsonl
