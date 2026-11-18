@@ -1,0 +1,33 @@
+REFERÊNCIAS VISUAIS URBANAS — AVEIRO
+=================================
+
+30 referências selecionadas (6 por classe), todas em categorias de Wikimedia Commons relacionadas com Portugal:
+- candeeiro
+- poste_de_luz
+- ilha_de_reciclagem
+- indiferenciado
+- subterraneo
+
+ATENÇÃO: este ZIP é um PACOTE DE LINKS/FONTES + SCRIPT; as fotografias em si não estão incluídas.
+O ambiente onde este pacote foi preparado não permitiu descarregar diretamente os ficheiros de imagem.
+
+PARA DESCARREGAR AS FOTOGRAFIAS REAIS E CRIAR AUTOMATICAMENTE O ZIP FINAL:
+- Windows: executar DESCARREGAR_IMAGENS.bat (Python instalado)
+- Linux/macOS: bash DESCARREGAR_IMAGENS.sh
+- Ou: python descarregar_imagens.py --width 1280
+- Para qualidade integral: python descarregar_imagens.py --original
+
+O script consulta a API Wikimedia Commons e guarda as imagens nas cinco pastas.
+Também cria LICENCAS_E_FONTES.csv com autor, licença e ligação a cada original,
+e produz fotografias_urbanas_aveiro_30_imagens.zip na pasta acima.
+É preciso ligação à Internet e Python >= 3.9; não são necessários outros pacotes.
+
+FONTES.csv / fontes.json: seleção original e URL da página de cada fotografia.
+GALERIA.html: pré-visualização de todas as imagens quando online.
+
+IMPORTANTE:
+- Cada fotografia tem a sua própria licença. Validar antes de usar em treino ou distribuição.
+- A categorização é uma seleção preliminar baseada nos ficheiros do Commons. Rever visualmente todas as imagens.
+- "Indiferenciado" depende do conteúdo e função do contentor, não apenas da sua cor.
+- Alguns exemplos de uma classe podem ser visualmente semelhantes a outra.
+- Fotografias não incluem anotações de deteção (bounding boxes).

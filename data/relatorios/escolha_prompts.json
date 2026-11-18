@@ -1,0 +1,47 @@
+{
+ "classificador": {
+  "iluminacao": {
+   "poste_iluminacao": [
+    "a modern street light on a tall grey metal pole",
+    "a tall street light pole",
+    "a tall slim metal street light pole with a lamp head at the top"
+   ],
+   "candeeiro": [
+    "an ornamental cast iron lamp post with lanterns",
+    "a wrought iron lantern",
+    "an ornamental street lamp"
+   ]
+  },
+  "residuos": {
+   "ilha_reciclagem": [
+    "blue, yellow and green recycling containers",
+    "brown recycling containers with blue, yellow and green openings",
+    "recycling containers with coloured openings"
+   ],
+   "indiferenciado": [
+    "a green wheeled garbage container",
+    "a four-wheeled waste container",
+    "a wheelie bin"
+   ],
+   "subterraneo": [
+    "a row of stainless steel bins with coloured stripes",
+    "underground container inlets on the sidewalk",
+    "a waste deposit column"
+   ]
+  }
+ },
+ "detetor": {
+  "iluminacao": [
+   "a decorative street lamp",
+   "a wall-mounted street lamp",
+   "an ornamental street lamp",
+   "a lamppost"
+  ],
+  "residuos": [
+   "a recycling container",
+   "a garbage container",
+   "a four-wheeled waste container",
+   "a waste container"
+  ]
+ }
+}

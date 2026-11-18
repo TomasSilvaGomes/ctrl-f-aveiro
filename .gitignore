@@ -1,0 +1,20 @@
+# Segredos (token da Mapillary) — NUNCA no repositório
+.env
+
+# Ambiente e caches
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+/docs
+/pdfs
+
+# Dados pesados ou que se voltam a gerar (ver README: "Descarregar as fotos")
+data/images/
+data/*/images/
+data/viz/
+data/*/viz/
+data/**/*.antes*.jsonl
+data/piloto_*/ground_truth/*.geojson
+*.zip

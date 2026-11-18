@@ -1,0 +1,81 @@
+﻿categoria,n,pasta,image_id,bbox,atual,ccas,verdade,quem
+iluminacao,1,piloto_rua,1305890741690332,"[4068, 1294, 4116, 1337]",nao,nao,nao,Claude (a rever pela equipa)
+iluminacao,2,piloto_rua,1723468021997883,"[2743, 1043, 2798, 1090]",candeeiro,poste_iluminacao,poste_iluminacao,Claude (a rever pela equipa)
+iluminacao,3,piloto_rua,1360294362823346,"[888, 881, 922, 1366]",nao,nao,,
+iluminacao,4,piloto_rua,1016990497323168,"[1584, 1133, 1618, 1373]",nao,nao,poste_iluminacao,Claude (a rever pela equipa)
+iluminacao,5,piloto_sequencia,1692062018606421,"[3912, 1242, 3930, 1377]",poste_iluminacao,poste_iluminacao,poste_iluminacao,Claude (a rever pela equipa)
+iluminacao,6,piloto_rua,1569172491465988,"[1233, 689, 1245, 950]",nao,nao,,
+iluminacao,7,piloto_rua,1707541987046033,"[4266, 1247, 4292, 1430]",nao,nao,,
+iluminacao,8,piloto_rua,960004040363077,"[2037, 682, 2106, 1560]",nao,poste_iluminacao,nao,Claude (a rever pela equipa)
+iluminacao,9,piloto_rua,1036784642663440,"[1753, 572, 1798, 1094]",nao,poste_iluminacao,,
+iluminacao,10,piloto_rua,1492804391731556,"[3412, 868, 3551, 1491]",nao,poste_iluminacao,,
+iluminacao,11,piloto_sequencia,1306968710949903,"[900, 1087, 950, 1395]",nao,poste_iluminacao,,
+iluminacao,12,piloto_rua,849946998157088,"[4536, 1001, 4596, 1390]",nao,nao,nao,Claude (a rever pela equipa)
+iluminacao,13,piloto_rua,890040850845996,"[3085, 746, 3127, 956]",nao,nao,,
+iluminacao,14,piloto_rua,1620331562959927,"[3220, 861, 3269, 1982]",nao,poste_iluminacao,poste_iluminacao,Claude (a rever pela equipa)
+iluminacao,15,piloto_rua,1521801179618453,"[1238, 1117, 1333, 1416]",nao,nao,nao,Claude (a rever pela equipa)
+iluminacao,16,piloto_rua,1620331562959927,"[400, 1083, 466, 1108]",poste_iluminacao,poste_iluminacao,nao,Claude (a rever pela equipa)
+iluminacao,17,piloto_rua,1492523965895649,"[4218, 1172, 4273, 1358]",nao,poste_iluminacao,nao,Claude (a rever pela equipa)
+iluminacao,18,piloto_sequencia,2172634780245733,"[3069, 675, 3141, 1352]",nao,poste_iluminacao,poste_iluminacao,Claude (a rever pela equipa)
+iluminacao,19,piloto_rua,1017572290727464,"[1593, 1074, 1626, 1366]",nao,poste_iluminacao,,
+iluminacao,20,piloto_sequencia,2202701597130605,"[3817, 1109, 3862, 1372]",candeeiro,poste_iluminacao,poste_iluminacao,Claude (a rever pela equipa)
+iluminacao,21,piloto_sequencia,892882950495448,"[1223, 1224, 1237, 1320]",candeeiro,poste_iluminacao,poste_iluminacao,Claude (a rever pela equipa)
+iluminacao,22,piloto_sequencia,1875174123148724,"[1349, 1184, 1372, 1320]",poste_iluminacao,poste_iluminacao,poste_iluminacao,Claude (a rever pela equipa)
+iluminacao,23,piloto_rua,978603714541555,"[705, 1218, 736, 1372]",nao,poste_iluminacao,poste_iluminacao,Claude (a rever pela equipa)
+iluminacao,24,piloto_rua,1519832216252207,"[976, 1151, 1000, 1344]",poste_iluminacao,poste_iluminacao,,
+iluminacao,25,piloto_rua,1285213089899298,"[1528, 1158, 1584, 1241]",nao,nao,nao,Claude (a rever pela equipa)
+iluminacao,26,piloto_rua,1683961189213851,"[794, 772, 834, 1358]",nao,nao,,
+iluminacao,27,piloto_sequencia,1483500039463338,"[3821, 1224, 3856, 1476]",poste_iluminacao,poste_iluminacao,,
+iluminacao,28,piloto_rua,1783020246003809,"[2276, 675, 2356, 1379]",nao,poste_iluminacao,,
+iluminacao,29,piloto_rua,2285988868603311,"[2740, 831, 2788, 955]",nao,poste_iluminacao,,
+iluminacao,30,piloto_sequencia,2480393609067013,"[3837, 1164, 3901, 1366]",candeeiro,poste_iluminacao,poste_iluminacao,Claude (a rever pela equipa)
+iluminacao,31,piloto_rua,1116867683995318,"[3511, 721, 3566, 1464]",nao,poste_iluminacao,,
+iluminacao,32,piloto_rua,1924829188224547,"[2537, 765, 2596, 1252]",nao,nao,,
+iluminacao,33,piloto_rua,883417524781190,"[328, 964, 403, 1405]",candeeiro,poste_iluminacao,poste_iluminacao,Claude (a rever pela equipa)
+iluminacao,34,piloto_rua,4323230737928968,"[1149, 1068, 1169, 1302]",nao,nao,,
+iluminacao,35,piloto_sequencia,1313147750268416,"[4460, 1202, 4499, 1520]",nao,poste_iluminacao,nao,Claude (a rever pela equipa)
+iluminacao,36,piloto_sequencia,934337956302427,"[2119, 1025, 2156, 1321]",nao,poste_iluminacao,,
+iluminacao,37,piloto_rua,2290068361402520,"[962, 1127, 1004, 1169]",poste_iluminacao,poste_iluminacao,nao,Claude (a rever pela equipa)
+iluminacao,38,piloto_sequencia,27242222538707096,"[3941, 1276, 3957, 1376]",candeeiro,poste_iluminacao,poste_iluminacao,Claude (a rever pela equipa)
+iluminacao,39,piloto_rua,1287963384389189,"[3765, 544, 3794, 1039]",nao,nao,nao,Claude (a rever pela equipa)
+iluminacao,40,piloto_rua,951458141047352,"[1147, 1221, 1183, 1330]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,1,piloto_sequencia,2444413165997434,"[293, 1442, 589, 1652]",indiferenciado,indiferenciado,indiferenciado,Claude (a rever pela equipa)
+residuos,2,piloto_rua,1304142068509429,"[4407, 1405, 4450, 1454]",subterraneo,nao,subterraneo,Claude (a rever pela equipa)
+residuos,3,piloto_rua,1735516107441073,"[1770, 1415, 1808, 1474]",nao,subterraneo,nao,Claude (a rever pela equipa)
+residuos,4,piloto_rua,1525870248923819,"[5154, 1384, 5190, 1437]",nao,subterraneo,,
+residuos,5,piloto_sequencia,3156114511444170,"[2502, 1307, 2524, 1343]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,6,piloto_sequencia,934337956302427,"[894, 1363, 918, 1400]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,7,piloto_rua,958338670441923,"[894, 1361, 916, 1401]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,8,piloto_sequencia,1002588486044536,"[911, 1378, 933, 1416]",indiferenciado,nao,nao,Claude (a rever pela equipa)
+residuos,9,piloto_rua,1558539685718750,"[2244, 1435, 2284, 1510]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,10,piloto_rua,2838652723161227,"[873, 1374, 944, 1445]",subterraneo,subterraneo,subterraneo,Claude (a rever pela equipa)
+residuos,11,piloto_rua,1328805445899192,"[1093, 978, 1121, 1017]",nao,nao,subterraneo,Claude (a rever pela equipa)
+residuos,12,piloto_sequencia,972508762350198,"[1915, 1323, 1997, 1422]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,13,piloto_rua,4342395936049718,"[4570, 1388, 4625, 1451]",subterraneo,nao,subterraneo,Claude (a rever pela equipa)
+residuos,14,piloto_rua,1413806403924927,"[1983, 928, 2079, 1152]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,15,piloto_sequencia,983458074391126,"[2443, 1299, 2470, 1354]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,16,piloto_sequencia,1511026407131840,"[3006, 1406, 3056, 1427]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,17,piloto_rua,1752903232816057,"[2609, 1350, 2631, 1414]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,18,piloto_rua,1723468021997883,"[3541, 1399, 3564, 1433]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,19,piloto_rua,1931504920822202,"[817, 1880, 1003, 1975]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,20,piloto_rua,1363373808986866,"[349, 1393, 375, 1434]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,21,piloto_rua,35899059409738793,"[201, 1383, 341, 1494]",subterraneo,subterraneo,subterraneo,Claude (a rever pela equipa)
+residuos,22,piloto_sequencia,1289113826624355,"[4327, 1425, 4344, 1463]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,23,piloto_sequencia,812349745290468,"[424, 1393, 454, 1444]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,24,piloto_rua,26943842518587872,"[1939, 1384, 1964, 1430]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,25,piloto_rua,1427460059185755,"[2464, 1505, 2502, 1677]",nao,indiferenciado,indiferenciado,Claude (a rever pela equipa)
+residuos,26,piloto_rua,1683266662761339,"[1311, 1009, 1419, 1113]",subterraneo,subterraneo,subterraneo,Claude (a rever pela equipa)
+residuos,27,piloto_rua,4395837100687293,"[584, 1352, 647, 1408]",nao,subterraneo,nao,Claude (a rever pela equipa)
+residuos,28,piloto_rua,1244375451055910,"[1760, 868, 1958, 949]",ilha_reciclagem,indiferenciado,nao,Claude (a rever pela equipa)
+residuos,29,piloto_sequencia,1527720405378608,"[3177, 1351, 3223, 1392]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,30,piloto_rua,1525870248923819,"[5152, 1380, 5183, 1438]",nao,subterraneo,,
+residuos,31,piloto_rua,1429052048977292,"[839, 1400, 869, 1435]",nao,nao,,
+residuos,32,piloto_sequencia,934337956302427,"[4951, 1458, 4976, 1493]",nao,nao,,
+residuos,33,piloto_rua,1534936834922643,"[5155, 1416, 5178, 1484]",nao,subterraneo,nao,Claude (a rever pela equipa)
+residuos,34,piloto_rua,1674451307134120,"[3854, 1394, 3880, 1445]",nao,subterraneo,nao,Claude (a rever pela equipa)
+residuos,35,piloto_rua,2065936080621949,"[819, 1880, 1006, 1974]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,36,piloto_sequencia,26894708240194647,"[960, 1352, 978, 1390]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,37,piloto_sequencia,1332102552203176,"[3504, 1416, 3554, 1537]",nao,subterraneo,nao,Claude (a rever pela equipa)
+residuos,38,piloto_rua,1232873228735117,"[2758, 1444, 2777, 1529]",nao,subterraneo,nao,Claude (a rever pela equipa)
+residuos,39,piloto_sequencia,26894708240194647,"[901, 1402, 935, 1460]",nao,nao,nao,Claude (a rever pela equipa)
+residuos,40,piloto_rua,1029246682857617,"[520, 1389, 545, 1432]",nao,nao,nao,Claude (a rever pela equipa)

@@ -1,0 +1,97 @@
+# Frases CANDIDATAS (inglês) para scripts/escolhe_prompts.py. Cada frase pertence a
+# UMA classe nossa (categoria / subtipo). Origem: dicionário dos modelos
+# (testa_vocabulario.py) + descrições ao estilo CuPL (várias descrições por classe).
+
+# Detetor (OWLv2): encontra a CATEGORIA. Frases curtas (<= 16 tokens).
+detetor:
+  iluminacao:
+    - a street light
+    - a street lamp
+    - a streetlight
+    - a lamp post
+    - a lamppost
+    - a light pole
+    - a lighting pole
+    - a tall street light pole
+    - a street light on a tall pole
+    - a street light pole with an arm
+    - a decorative street lamp
+    - an ornamental street lamp
+    - a wall-mounted street lamp
+    - a street lantern
+    - a lamp
+    - a utility pole
+  residuos:
+    - a trash bin
+    - a waste container
+    - a recycling container
+    - a recycling bin
+    - a garbage container
+    - a garbage can
+    - a dumpster
+    - a four-wheeled waste container
+    - a large wheeled garbage container
+    - a wheelie bin
+    - an underground waste container
+    - a semi-underground waste container
+    - a waste deposit column
+    - a recycling igloo
+    - a row of recycling containers
+
+# Classificador (SigLIP): escolhe o SUBTIPO dentro da categoria.
+classificador:
+  iluminacao:
+    poste_iluminacao:
+      - a street light
+      - a street light pole with an arm
+      - a lighting pole
+      - a light pole
+      - a lamppost
+      - a tall street light pole
+      - a tall slim metal street light pole with a lamp head at the top
+      - a modern street light on a tall grey metal pole
+      - a street lamp on a tall metal post
+      - a utility pole
+    candeeiro:
+      - an ornamental street lamp
+      - a decorative street lamp
+      - a vintage street lamp
+      - a street lantern
+      - two lanterns on a wall bracket
+      - a classic lantern on a wrought iron bracket
+      - a wall-mounted lantern
+      - an ornamental cast iron lamp post with lanterns
+      - a wrought iron lantern
+      - a lamp
+  residuos:
+    ilha_reciclagem:
+      - recycling containers with coloured openings
+      - brown recycling containers with blue, yellow and green openings
+      - blue, yellow and green recycling containers
+      - a row of recycling containers
+      - a recycling igloo
+      - a recycling bank
+      - a glass recycling container
+      - a recycling station
+      - a recycling bin
+      - a large dark blue plastic recycling bell container with a coloured opening
+    indiferenciado:
+      - a four-wheeled waste container
+      - a green wheeled garbage container
+      - a large wheeled garbage container
+      - a wheelie bin
+      - a large plastic garbage container with a lid on wheels
+      - a black or dark grey wheeled plastic garbage container with a lid
+      - a dumpster
+      - a municipal waste container
+      - a garbage container
+    subterraneo:
+      - a row of stainless steel bins with coloured stripes
+      - stainless steel waste inlets on a paved platform
+      - an underground waste container
+      - a semi-underground waste container
+      - a waste deposit column
+      - underground container inlets on the sidewalk
+      - a grey cylinder with a black dome lid
+      - a large round semi-underground waste container with wooden slat cladding and a black dome lid with a lifting ring
+      - a row of dark metal underground waste container inlets with yellow, blue or green openings on a metal platform

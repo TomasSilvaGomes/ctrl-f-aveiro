@@ -1,0 +1,213 @@
+# Taxonomia do catálogo: categoria -> subtipos.
+#
+# - label:     nome mostrado na aplicação (PT)
+# - codigo:    código existente, quando há:
+#                sinais -> Regulamento de Sinalização do Trânsito (RST), no formato
+#                          do OpenStreetMap (traffic_sign=PT:B2)
+#                outros -> tag OpenStreetMap equivalente
+#              null = não existe / por confirmar (acrescentar quando se souber)
+# - mapillary: classes equivalentes na nomenclatura da Mapillary (aceita prefixos
+#              terminados em "*"). Usado para comparar com as anotações Mapillary.
+# - prompts:   descrições (inglês) para o classificador zero-shot (SigLIP).
+# - {n} no label é substituído pelo número lido pelo SigLIP (limites de velocidade).
+#
+# Para acrescentar um subtipo: copiar um bloco e mudar id/label/codigo/mapillary/prompts.
+
+# Frases do DETETOR (OWLv2, máx. 16 tokens) por categoria. O detetor só encontra a
+# categoria; o subtipo é decidido depois pelo SigLIP (prompts de cada subtipo).
+# Escolha das frases: scripts/escolhe_prompts.py.
+detetor:
+  sinalizacao: ["a traffic sign", "a stop sign", "a yield sign", "a speed limit sign"]
+  # Escolhidas por escolhe_prompts.py (17/11). Iluminação encontrada, rua seguida / outra rua:
+  #   "a lamp"+"a utility pole" 21% / 7% · "a street light"+"a lamp post" 50% / 60% · estas 50% / 62%
+  iluminacao: ["a decorative street lamp", "a wall-mounted street lamp", "an ornamental street lamp", "a lamppost"]
+  # Contentores: as frases CCAS não ganharam (53% vs 51% numa rua, 18% vs 20% na outra) -> ficam estas.
+  residuos: ["a trash bin", "a waste container", "a recycling container"]
+
+categorias:
+  sinalizacao:
+    label: Sinal
+    subtipos:
+      - id: stop
+        label: Sinal STOP
+        codigo: PT:B2
+        mapillary: ["regulatory--stop--*"]
+        prompts: ["a red octagonal STOP traffic sign"]
+      - id: cedencia
+        label: Sinal Cedência de passagem
+        codigo: PT:B1
+        mapillary: ["regulatory--yield--*"]
+        prompts: ["an inverted triangle yield traffic sign with red border and white center"]
+      - id: limite_velocidade
+        label: Sinal Limite de velocidade {n} km/h
+        codigo: PT:C13
+        mapillary: ["regulatory--maximum-speed-limit-*"]
+        prompts: ["a round white speed limit traffic sign with a red border and a black number"]
+      - id: sentido_proibido
+        label: Sinal Sentido proibido
+        codigo: PT:C1
+        mapillary: ["regulatory--no-entry--*"]
+        prompts: ["a round red no entry traffic sign with a white horizontal bar"]
+      - id: estacionamento_proibido
+        label: Sinal Estacionamento proibido
+        codigo: PT:C15
+        mapillary: ["regulatory--no-parking--*"]
+        prompts: ["a round blue traffic sign with a red border and one red diagonal line"]
+      - id: paragem_estacionamento_proibidos
+        label: Sinal Paragem e estacionamento proibidos
+        codigo: PT:C16
+        mapillary: ["regulatory--no-stopping--*"]
+        prompts: ["a round blue traffic sign with a red border and a red X cross"]
+      - id: proibido_virar
+        label: Sinal Proibido virar / inversão de marcha
+        codigo: null   # família C do RST — confirmar códigos (C11a/C11b/...)
+        mapillary: ["regulatory--no-left-turn--*", "regulatory--no-right-turn--*", "regulatory--no-u-turn--*"]
+        prompts: ["a round white traffic sign with red border and a crossed-out turning arrow"]
+      - id: obrigacao
+        label: Sinal de obrigação
+        codigo: null   # família D do RST (sentido obrigatório, rotunda, pista ciclável...)
+        mapillary: ["regulatory--keep-right--*", "regulatory--keep-left--*", "regulatory--turn-*",
+                    "regulatory--go-straight*", "regulatory--roundabout--*",
+                    "regulatory--bicycles-only--*", "regulatory--buses-only--*",
+                    "regulatory--pedestrians-only--*"]
+        prompts: ["a round blue mandatory traffic sign with a white arrow or symbol"]
+      - id: sentido_unico
+        label: Sinal Trânsito de sentido único
+        codigo: null   # provável H3 do RST — confirmar
+        mapillary: ["regulatory--one-way-*"]
+        prompts: ["a blue square traffic sign with a white upward arrow, one way street"]
+      - id: passagem_peoes
+        label: Sinal Passagem para peões
+        codigo: PT:H7
+        mapillary: ["information--pedestrians-crossing--*"]
+        prompts: ["a blue square traffic sign with a white triangle showing a pedestrian on a crosswalk"]
+      - id: estacionamento
+        label: Sinal Estacionamento
+        codigo: PT:H1
+        mapillary: ["information--parking--*"]
+        prompts: ["a blue square parking traffic sign with a white letter P"]
+      - id: perigo
+        label: Sinal de perigo
+        codigo: null   # família A do RST (lomba, rotunda, peões...)
+        mapillary: ["warning--*"]
+        prompts: ["a triangular warning traffic sign with a red border and a black symbol"]
+      - id: direcao
+        label: Sinal de direção / indicação
+        codigo: null   # famílias J/L do RST
+        mapillary: ["information--general-directions--*", "information--dead-end--*",
+                    "information--living-street--*", "information--end-of-living-street--*"]
+        prompts: ["a rectangular direction sign with place names and arrows"]
+      - id: outro
+        label: Sinal (outro)
+        codigo: null
+        mapillary: ["regulatory--*", "information--*", "complementary--*"]
+        prompts: ["a traffic sign"]
+
+  iluminacao:
+    label: Iluminação pública
+    # Definição dos mentores (17/11), com 2 fotos de exemplo de Aveiro:
+    #  - Poste de iluminação: poste alto e liso (metal), luminária no topo ou num braço;
+    #  - Candeeiro: lanterna decorativa de estilo antigo, presa à parede (braço de
+    #    ferro forjado) ou em poste curto ornamentado, muitas vezes com 2 lanternas.
+    # Postes de eletricidade/telecomunicações: descartar (estão nos negativos).
+    # Frases escolhidas por escolhe_prompts.py (fase 1, 30 fotos de referência) e
+    # confirmadas na auditoria visual (audita_classificacao.py, 17/11): iluminação certa
+    # 74% vs 48% com "a lamp"/"a utility pole".
+    subtipos:
+      - id: poste_iluminacao
+        label: Poste de luz
+        codigo: highway=street_lamp
+        mapillary: ["object--street-light"]   # a Mapillary marca só a cabeça (luminária)
+        prompts: ["a modern street light on a tall grey metal pole",
+                  "a tall street light pole",
+                  "a tall slim metal street light pole with a lamp head at the top"]
+      - id: candeeiro
+        label: Candeeiro
+        codigo: highway=street_lamp   # + lamp_mount=wall_mounted quando está na parede
+        mapillary: []
+        prompts: ["an ornamental cast iron lamp post with lanterns",
+                  "a wrought iron lantern",
+                  "an ornamental street lamp"]
+
+  residuos:
+    label: Resíduos
+    # Só 3 tipos (ficha do desafio): ilha de reciclagem (ecoponto), indiferenciado,
+    # subterrâneo. O tipo vem só do SigLIP (sem regras de cor nem frações).
+    # Papeleiras não são pedidas: estão nos negativos (descartadas).
+    # Frases CCAS testadas a 17/11 e rejeitadas (auditoria 72% vs 89%: deixavam passar
+    # papeleiras) -> ficam estas.
+    # A Mapillary só tem "object--trash-can" (sem tipo).
+    subtipos:
+      - id: ilha_reciclagem
+        label: Ilha de reciclagem (ecoponto)
+        codigo: amenity=recycling
+        mapillary: []
+        prompts: ["a large dark blue plastic recycling bell container with a coloured opening",
+                  "dark blue recycling containers with yellow, green and blue openings"]
+      - id: indiferenciado
+        label: Contentor indiferenciado
+        codigo: amenity=waste_disposal
+        mapillary: []
+        prompts: ["a black or dark grey wheeled plastic garbage container with a lid",
+                  "a large green wheeled garbage container"]
+      # Duas famílias (catálogo de fabricante, ex. Subtainer/APYRA e Tierso/Molok):
+      #  - enterrado: só se vê o "marco de deposição", caixa metálica escura de ~1 m,
+      #    assente numa placa metálica/pedra no passeio;
+      #  - semi-enterrado: cilindro largo e baixo, revestido a ripas de madeira, aço
+      #    ou cinzento, com tampa escura em cúpula e argola de elevação no topo.
+      - id: subterraneo
+        label: Contentor subterrâneo
+        codigo: location=underground
+        mapillary: []
+        # Regra de tamanho (geolocate.py, onde a distância é conhecida): semi-enterrados
+        # têm 1,45–1,95 m de diâmetro; papeleiras ~0,5 m. Mais estreito que 1,2 m ->
+        # descartado (quase sempre papeleira). Atenção: marcos de enterrados (~0,5–0,7 m)
+        # também são descartados.
+        largura_min_m: 1.2
+        senao: descartar
+        # NÃO usar "caixa metálica escura de topo arredondado" sozinha: testado a 17/11,
+        # apanha as papeleiras (só 4 em 40 eram subterrâneos).
+        prompts: ["a row of dark metal underground waste container inlets with yellow, blue or green openings on a metal platform",
+                  "grey cylindrical waste deposit columns with dark lids, the inlets of underground containers",
+                  "a large round semi-underground waste container with wooden slat cladding and a black dome lid with a lifting ring",
+                  "a large round grey semi-underground waste container with a dark dome lid"]
+
+# Catálogo: ecopontos próximos (vários "iglus" lado a lado) formam UMA ilha.
+agrupamentos:
+  ilha_reciclagem:
+    label: Ilha de reciclagem (ecoponto)
+    codigo: amenity=recycling
+    categoria: residuos
+    membros: [ilha_reciclagem]
+    raio_m: 8          # contentores a <= 8 m entre si formam uma ilha
+    min_membros: 1
+
+# Descrições "não é mobiliário": se uma destas ganhar, a deteção é descartada
+# (reduz falsos positivos do detetor zero-shot).
+negativos:
+  - "a tree trunk"
+  - "a building facade"
+  - "a window"
+  - "a car"
+  - "a person"
+  - "an advertising billboard"
+  - "a traffic light"
+  - "empty sky"
+  - "an electrical utility cabinet"
+  - "a red fire hydrant"
+  - "a red mailbox"
+  - "a parking meter"
+  - "a public bench"
+  - "a flower planter"
+  - "a bus stop shelter"
+  - "a narrow grey telecom or electrical box on the sidewalk"
+  - "a short metal bollard"
+  - "a public information panel"
+  - "an ATM cash machine"
+  - "a fuel pump at a petrol station"
+  - "a concrete block"
+  - "a small litter bin attached to a pole on the sidewalk"   # papeleiras: não pedidas
+  - "a small public trash can on a post"
+  - "a wooden or concrete utility pole with electric wires and no lamp"   # mentores: ignorar
+  # NÃO usar "a bare metal pole without any lamp": testado a 17/11, descartava postes de
+  # iluminação verdadeiros (luminária pequena no recorte) — a deteção caiu de 53% para 38%.

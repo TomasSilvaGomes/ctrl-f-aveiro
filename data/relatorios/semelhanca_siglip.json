@@ -1,0 +1,375 @@
+{
+ "modelo": "siglip",
+ "n": 2325,
+ "certo": {
+  "modelo": 0.835,
+  "+pixeis": 0.834,
+  "+zonas": 0.834,
+  "+pixeis_se_duvida": 0.842
+ },
+ "pares_esq_dir": {
+  "n": 263,
+  "modelo": 0.688,
+  "+pixeis": 0.677,
+  "+zonas": 0.673,
+  "+pixeis_se_duvida": 0.745
+ },
+ "por_classe": {
+  "information--pedestrians-crossing": {
+   "n": 557,
+   "modelo": 0.912,
+   "+pixeis": 0.912,
+   "+zonas": 0.912,
+   "+pixeis_se_duvida": 0.912
+  },
+  "regulatory--no-entry": {
+   "n": 415,
+   "modelo": 0.954,
+   "+pixeis": 0.954,
+   "+zonas": 0.954,
+   "+pixeis_se_duvida": 0.954
+  },
+  "regulatory--one-way-straight": {
+   "n": 168,
+   "modelo": 0.732,
+   "+pixeis": 0.732,
+   "+zonas": 0.732,
+   "+pixeis_se_duvida": 0.732
+  },
+  "regulatory--yield": {
+   "n": 161,
+   "modelo": 0.919,
+   "+pixeis": 0.919,
+   "+zonas": 0.919,
+   "+pixeis_se_duvida": 0.919
+  },
+  "regulatory--no-stopping": {
+   "n": 159,
+   "modelo": 0.906,
+   "+pixeis": 0.906,
+   "+zonas": 0.906,
+   "+pixeis_se_duvida": 0.906
+  },
+  "regulatory--stop": {
+   "n": 99,
+   "modelo": 0.97,
+   "+pixeis": 0.97,
+   "+zonas": 0.97,
+   "+pixeis_se_duvida": 0.97
+  },
+  "warning--road-bump": {
+   "n": 69,
+   "modelo": 0.565,
+   "+pixeis": 0.565,
+   "+zonas": 0.565,
+   "+pixeis_se_duvida": 0.565
+  },
+  "regulatory--keep-right": {
+   "n": 69,
+   "modelo": 0.754,
+   "+pixeis": 0.725,
+   "+zonas": 0.696,
+   "+pixeis_se_duvida": 0.725
+  },
+  "regulatory--bicycles-only": {
+   "n": 57,
+   "modelo": 0.772,
+   "+pixeis": 0.772,
+   "+zonas": 0.772,
+   "+pixeis_se_duvida": 0.772
+  },
+  "regulatory--roundabout": {
+   "n": 56,
+   "modelo": 0.839,
+   "+pixeis": 0.839,
+   "+zonas": 0.839,
+   "+pixeis_se_duvida": 0.839
+  },
+  "information--parking": {
+   "n": 46,
+   "modelo": 0.826,
+   "+pixeis": 0.826,
+   "+zonas": 0.826,
+   "+pixeis_se_duvida": 0.826
+  },
+  "regulatory--no-right-turn": {
+   "n": 44,
+   "modelo": 0.75,
+   "+pixeis": 0.545,
+   "+zonas": 0.659,
+   "+pixeis_se_duvida": 0.659
+  },
+  "regulatory--maximum-speed-limit-30": {
+   "n": 43,
+   "modelo": 0.326,
+   "+pixeis": 0.326,
+   "+zonas": 0.326,
+   "+pixeis_se_duvida": 0.326
+  },
+  "information--dead-end": {
+   "n": 41,
+   "modelo": 0.78,
+   "+pixeis": 0.78,
+   "+zonas": 0.78,
+   "+pixeis_se_duvida": 0.78
+  },
+  "regulatory--no-left-turn": {
+   "n": 34,
+   "modelo": 0.676,
+   "+pixeis": 0.588,
+   "+zonas": 0.618,
+   "+pixeis_se_duvida": 0.706
+  },
+  "warning--two-way-traffic": {
+   "n": 31,
+   "modelo": 0.742,
+   "+pixeis": 0.419,
+   "+zonas": 0.161,
+   "+pixeis_se_duvida": 0.742
+  },
+  "warning--roundabout": {
+   "n": 30,
+   "modelo": 0.633,
+   "+pixeis": 0.633,
+   "+zonas": 0.633,
+   "+pixeis_se_duvida": 0.633
+  },
+  "regulatory--no-parking": {
+   "n": 27,
+   "modelo": 0.63,
+   "+pixeis": 0.63,
+   "+zonas": 0.63,
+   "+pixeis_se_duvida": 0.63
+  },
+  "regulatory--turn-right-ahead": {
+   "n": 26,
+   "modelo": 0.846,
+   "+pixeis": 0.808,
+   "+zonas": 0.846,
+   "+pixeis_se_duvida": 0.846
+  },
+  "regulatory--road-closed-to-vehicles": {
+   "n": 17,
+   "modelo": 1.0,
+   "+pixeis": 1.0,
+   "+zonas": 1.0,
+   "+pixeis_se_duvida": 1.0
+  },
+  "regulatory--turn-left-ahead": {
+   "n": 16,
+   "modelo": 0.062,
+   "+pixeis": 0.812,
+   "+zonas": 0.75,
+   "+pixeis_se_duvida": 0.688
+  },
+  "regulatory--turn-left": {
+   "n": 16,
+   "modelo": 0.312,
+   "+pixeis": 0.938,
+   "+zonas": 0.938,
+   "+pixeis_se_duvida": 0.938
+  },
+  "regulatory--turn-right": {
+   "n": 13,
+   "modelo": 0.923,
+   "+pixeis": 0.692,
+   "+zonas": 0.923,
+   "+pixeis_se_duvida": 0.692
+  },
+  "regulatory--buses-only": {
+   "n": 12,
+   "modelo": 0.667,
+   "+pixeis": 0.667,
+   "+zonas": 0.667,
+   "+pixeis_se_duvida": 0.667
+  },
+  "regulatory--go-straight": {
+   "n": 11,
+   "modelo": 0.455,
+   "+pixeis": 0.455,
+   "+zonas": 0.455,
+   "+pixeis_se_duvida": 0.455
+  },
+  "regulatory--height-limit": {
+   "n": 9,
+   "modelo": 0.556,
+   "+pixeis": 0.556,
+   "+zonas": 0.556,
+   "+pixeis_se_duvida": 0.556
+  },
+  "warning--pedestrians-crossing": {
+   "n": 8,
+   "modelo": 0.75,
+   "+pixeis": 0.75,
+   "+zonas": 0.75,
+   "+pixeis_se_duvida": 0.75
+  },
+  "regulatory--turn-left-or-right": {
+   "n": 8,
+   "modelo": 0.75,
+   "+pixeis": 0.75,
+   "+zonas": 0.75,
+   "+pixeis_se_duvida": 0.75
+  },
+  "regulatory--go-straight-or-turn-right": {
+   "n": 8,
+   "modelo": 0.625,
+   "+pixeis": 0.875,
+   "+zonas": 0.875,
+   "+pixeis_se_duvida": 0.875
+  },
+  "regulatory--no-u-turn": {
+   "n": 6,
+   "modelo": 1.0,
+   "+pixeis": 1.0,
+   "+zonas": 1.0,
+   "+pixeis_se_duvida": 1.0
+  },
+  "regulatory--weight-limit": {
+   "n": 6,
+   "modelo": 0.333,
+   "+pixeis": 0.333,
+   "+zonas": 0.333,
+   "+pixeis_se_duvida": 0.333
+  },
+  "regulatory--maximum-speed-limit-40": {
+   "n": 6,
+   "modelo": 1.0,
+   "+pixeis": 1.0,
+   "+zonas": 1.0,
+   "+pixeis_se_duvida": 1.0
+  },
+  "warning--other-danger": {
+   "n": 5,
+   "modelo": 1.0,
+   "+pixeis": 1.0,
+   "+zonas": 1.0,
+   "+pixeis_se_duvida": 1.0
+  },
+  "regulatory--end-of-bicycles-only": {
+   "n": 5,
+   "modelo": 0.8,
+   "+pixeis": 0.8,
+   "+zonas": 0.8,
+   "+pixeis_se_duvida": 0.8
+  },
+  "regulatory--end-of-parking-zone": {
+   "n": 5,
+   "modelo": 0.4,
+   "+pixeis": 0.4,
+   "+zonas": 0.4,
+   "+pixeis_se_duvida": 0.4
+  },
+  "regulatory--no-heavy-goods-vehicles": {
+   "n": 4,
+   "modelo": 0.5,
+   "+pixeis": 0.5,
+   "+zonas": 0.5,
+   "+pixeis_se_duvida": 0.5
+  },
+  "warning--roadworks": {
+   "n": 4,
+   "modelo": 0.5,
+   "+pixeis": 0.5,
+   "+zonas": 0.5,
+   "+pixeis_se_duvida": 0.5
+  },
+  "regulatory--dual-path-bicycles-and-pedestrians": {
+   "n": 4,
+   "modelo": 0.75,
+   "+pixeis": 0.75,
+   "+zonas": 0.75,
+   "+pixeis_se_duvida": 0.75
+  },
+  "regulatory--no-overtaking": {
+   "n": 4,
+   "modelo": 1.0,
+   "+pixeis": 1.0,
+   "+zonas": 1.0,
+   "+pixeis_se_duvida": 1.0
+  },
+  "warning--children": {
+   "n": 4,
+   "modelo": 0.75,
+   "+pixeis": 0.75,
+   "+zonas": 0.75,
+   "+pixeis_se_duvida": 0.75
+  },
+  "warning--traffic-signals": {
+   "n": 4,
+   "modelo": 0.5,
+   "+pixeis": 0.5,
+   "+zonas": 0.5,
+   "+pixeis_se_duvida": 0.5
+  },
+  "regulatory--go-straight-or-turn-left": {
+   "n": 4,
+   "modelo": 0.75,
+   "+pixeis": 1.0,
+   "+zonas": 1.0,
+   "+pixeis_se_duvida": 1.0
+  },
+  "regulatory--maximum-speed-limit-50": {
+   "n": 3,
+   "modelo": 1.0,
+   "+pixeis": 1.0,
+   "+zonas": 1.0,
+   "+pixeis_se_duvida": 1.0
+  },
+  "warning--bicycles-crossing": {
+   "n": 3,
+   "modelo": 0.667,
+   "+pixeis": 0.667,
+   "+zonas": 0.667,
+   "+pixeis_se_duvida": 0.667
+  },
+  "regulatory--pedestrians-only": {
+   "n": 2,
+   "modelo": 1.0,
+   "+pixeis": 1.0,
+   "+zonas": 1.0,
+   "+pixeis_se_duvida": 1.0
+  },
+  "regulatory--length-limit": {
+   "n": 2,
+   "modelo": 0.0,
+   "+pixeis": 0.0,
+   "+zonas": 0.0,
+   "+pixeis_se_duvida": 0.0
+  },
+  "warning--curve-right": {
+   "n": 2,
+   "modelo": 1.0,
+   "+pixeis": 1.0,
+   "+zonas": 1.0,
+   "+pixeis_se_duvida": 1.0
+  },
+  "regulatory--end-of-no-parking": {
+   "n": 1,
+   "modelo": 0.0,
+   "+pixeis": 0.0,
+   "+zonas": 0.0,
+   "+pixeis_se_duvida": 0.0
+  },
+  "regulatory--maximum-speed-limit-20": {
+   "n": 1,
+   "modelo": 1.0,
+   "+pixeis": 1.0,
+   "+zonas": 1.0,
+   "+pixeis_se_duvida": 1.0
+  }
+ },
+ "pares": [
+  "A1a/A1b",
+  "A1c/A1d",
+  "A25/A4a",
+  "A3a/A3b",
+  "A4b/A4c",
+  "A7a/A7b",
+  "C11a/C11b",
+  "D1a/D1b",
+  "D1d/D1e",
+  "D2a/D2b",
+  "D3a/D3b"
+ ]
+}

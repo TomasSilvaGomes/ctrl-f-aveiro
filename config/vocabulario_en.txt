@@ -1,0 +1,97 @@
+# --- iluminação
+a lamp
+a street lamp
+a streetlight
+a street light
+a lamp post
+a lamppost
+a light pole
+a lighting pole
+a utility pole
+an electricity pole
+a power pole
+a telephone pole
+a metal pole
+a tall metal pole
+a tall street light pole
+a street light on a tall pole
+a street light pole with an arm
+a cobra head street light
+an LED street light
+a lantern
+a street lantern
+a wall lantern
+a wall-mounted lantern
+a wall-mounted street lamp
+an ornamental street lamp
+a decorative street lamp
+a vintage street lamp
+a classic lantern on a bracket
+two lanterns on a wall bracket
+a wrought iron lantern
+a cast iron lamp post
+a gas lamp
+a lamp mounted on a building
+a light fixture
+a luminaire
+a floodlight
+
+# --- resíduos
+a trash can
+a trash bin
+a garbage can
+a garbage bin
+a rubbish bin
+a litter bin
+a waste bin
+a wheelie bin
+a dumpster
+a waste container
+a garbage container
+a large garbage container
+a large wheeled garbage container
+a green wheeled garbage container
+a four-wheeled waste container
+a plastic waste container with a lid
+a municipal waste container
+a recycling bin
+a recycling container
+a recycling bank
+a recycling station
+a recycling point
+a bottle bank
+a glass recycling container
+a paper recycling container
+a row of recycling containers
+recycling containers with coloured openings
+brown recycling containers with blue, yellow and green openings
+a recycling igloo
+a recycling bell
+an underground waste container
+an underground bin
+an underground garbage container
+an underground recycling container
+a semi-underground waste container
+a semi-buried waste container
+a waste deposit column
+a stainless steel waste column
+a row of stainless steel bins with coloured stripes
+a cylindrical waste container
+a round grey container with a dome lid
+a grey cylinder with a black dome lid
+a waste container with a dome lid
+a bollard bin
+a post box
+a mailbox
+
+# 
+a bollard
+a traffic sign
+a tree
+a bench
+a parking meter
+an electrical cabinet
+a fire hydrant
+a planter
+a column
+a chimney

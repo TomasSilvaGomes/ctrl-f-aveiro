@@ -1,0 +1,321 @@
+codigo,nome,familia,pagina,ficheiro
+A1a,Curva à direita,perigo,11,sinais/A1a.png
+A1b,Curva à esquerda,perigo,11,sinais/A1b.png
+A1c,Curva à direita e contracurva,perigo,11,sinais/A1c.png
+A1d,Curva à esquerda e contracurva,perigo,11,sinais/A1d.png
+A2a,Lomba,perigo,11,sinais/A2a.png
+A2b,Depressão,perigo,11,sinais/A2b.png
+A2c,Lomba ou depressão,perigo,11,sinais/A2c.png
+A3a,Descida perigosa,perigo,11,sinais/A3a.png
+A3b,Subida de inclinação acentuada,perigo,11,sinais/A3b.png
+A4a,Passagem estreita,perigo,11,sinais/A4a.png
+A4b,Passagem estreita,perigo,11,sinais/A4b.png
+A4c,Passagem estreita,perigo,11,sinais/A4c.png
+A5,Pavimento escorregadio,perigo,11,sinais/A5.png
+A6,Projecção de gravilha,perigo,11,sinais/A6.png
+A7a,Bermas baixas,perigo,11,sinais/A7a.png
+A7b,Bermas baixas,perigo,11,sinais/A7b.png
+A8,Saída num cais ou precipício,perigo,11,sinais/A8.png
+A9,Queda de pedras,perigo,11,sinais/A9.png
+A10,Ponte móvel,perigo,11,sinais/A10.png
+A11,Neve ou gelo,perigo,11,sinais/A11.png
+A12,Vento lateral,perigo,12,sinais/A12.png
+A13,Visibilidade insuficiente,perigo,12,sinais/A13.png
+A14,Crianças,perigo,12,sinais/A14.png
+A15,Idosos,perigo,12,sinais/A15.png
+A16a,Passagem de peões,perigo,12,sinais/A16a.png
+A16b,Travessia de peões,perigo,12,sinais/A16b.png
+A17,Saída de ciclistas,perigo,12,sinais/A17.png
+A18,Cavaleiros,perigo,12,sinais/A18.png
+A19a,Animais,perigo,12,sinais/A19a.png
+A19b,Animais selvagens,perigo,12,sinais/A19b.png
+A20,Túnel,perigo,12,sinais/A20.png
+A21,Pista de aviação,perigo,12,sinais/A21.png
+A22,Sinalização luminosa,perigo,12,sinais/A22.png
+A23,Trabalhos na via,perigo,12,sinais/A23.png
+A24,Cruzamento ou entroncamento,perigo,12,sinais/A24.png
+A25,Trânsito nos dois sentidos,perigo,12,sinais/A25.png
+A26,Passagem de nível com guarda,perigo,12,sinais/A26.png
+A27,Passagem de nível sem guarda,perigo,12,sinais/A27.png
+A28,Intersecção com via onde circulam veículos sobre carris,perigo,12,sinais/A28.png
+A29,Outros perigos,perigo,12,sinais/A29.png
+A30,Congestionamento,perigo,13,sinais/A30.png
+A31,Obstrução da via,perigo,13,sinais/A31.png
+A32a,Local de passagem de nível sem guarda,perigo,13,sinais/A32a.png
+A32b,Local de passagem de nível sem guarda com duas ou mais vias,perigo,13,sinais/A32b.png
+B1,Cedência de passagem,cedencia,14,sinais/B1.png
+B2,Paragem obrigatória em cruzamentos ou entroncamentos,cedencia,14,sinais/B2.png
+B3,Via com prioridade,cedencia,14,sinais/B3.png
+B4,Fim de via com prioridade,cedencia,14,sinais/B4.png
+B5,Cedência de passagem nos estreitamentos da faixa de rodagem,cedencia,14,sinais/B5.png
+B6,Prioridade nos estreitamentos da faixa de rodagem,cedencia,14,sinais/B6.png
+B7,Aproximação de rotunda,cedencia,14,sinais/B7.png
+B9a,Entroncamento com via sem prioridade,cedencia,14,sinais/B9a.png
+B9b,Entroncamento com via sem prioridade,cedencia,14,sinais/B9b.png
+B9c,Entroncamento com via sem prioridade,cedencia,14,sinais/B9c.png
+B9d,Entroncamento com via sem prioridade,cedencia,14,sinais/B9d.png
+C1,Sentido proibido,proibicao,15,sinais/C1.png
+C2,Trânsito proibido,proibicao,15,sinais/C2.png
+C3a,Trânsito proibido a automóveis e motociclos com carro,proibicao,15,sinais/C3a.png
+C3b,Trânsito proibido a automóveis pesados,proibicao,15,sinais/C3b.png
+C3c,Trânsito proibido a automóveis de mercadorias,proibicao,15,sinais/C3c.png
+C3d,Trânsito proibido a automóveis de mercadorias de peso total superior a ... t,proibicao,15,sinais/C3d.png
+C3e,Trânsito proibido a motociclos simples,proibicao,15,sinais/C3e.png
+C3f,Trânsito proibido a ciclomotores,proibicao,15,sinais/C3f.png
+C3g,Trânsito proibido a velocípedes,proibicao,15,sinais/C3g.png
+C3h,Trânsito proibido a veículos agrícolas,proibicao,15,sinais/C3h.png
+C3i,Trânsito proibido a veículos de tracção animal,proibicao,15,sinais/C3i.png
+C3j,Trânsito proibido a carros de mão,proibicao,15,sinais/C3j.png
+C3l,Trânsito proibido a peões,proibicao,15,sinais/C3l.png
+C3m,Trânsito proibido a cavaleiros,proibicao,15,sinais/C3m.png
+C3n,Trânsito proibido a veículos com reboque,proibicao,15,sinais/C3n.png
+C3o,Trânsito proibido a veículos com reboque de dois ou mais eixos,proibicao,15,sinais/C3o.png
+C3p,Trânsito proibido a veículos transportando mercadorias perigosas,proibicao,16,sinais/C3p.png
+C3q,Trânsito proibido a veículos transportando produtos facilmente,proibicao,16,sinais/C3q.png
+C3r,Trânsito proibido a veículos transportando produtos susceptíveis de,proibicao,16,sinais/C3r.png
+C4a,Trânsito proibido a automóveis e motociclos,proibicao,16,sinais/C4a.png
+C4b,Trânsito proibido a automóveis de mercadorias e a veículos a motor com reboque,proibicao,16,sinais/C4b.png
+C4c,"Trânsito proibido a automóveis, a motociclos e a veículos de tracção animal",proibicao,16,sinais/C4c.png
+C4d,Trânsito proibido a automóveis de mercadorias e a veículos de tracção animal,proibicao,16,sinais/C4d.png
+C4e,"Trânsito proibido a peões, a animais e a veículos que não sejam automóveis ou",proibicao,16,sinais/C4e.png
+C4f,Trânsito proibido a veículos de duas rodas,proibicao,16,sinais/C4f.png
+C5,Trânsito proibido a veículos de peso por eixo superior a ... t,proibicao,16,sinais/C5.png
+C6,Trânsito proibido a veículos de peso total superior a ... t,proibicao,16,sinais/C6.png
+C7,Trânsito proibido a veículos ou conjunto de veículos de comprimento superior a,proibicao,16,sinais/C7.png
+C8,Trânsito proibido a veículos de largura superior a ... m,proibicao,16,sinais/C8.png
+C9,Trânsito proibido a veículos de altura superior a ... m,proibicao,16,sinais/C9.png
+C10,Proibição de transitar a menos de ... m do veículo precedente,proibicao,16,sinais/C10.png
+C11a,Proibição de virar à direita,proibicao,16,sinais/C11a.png
+C11b,Proibição de virar à esquerda,proibicao,17,sinais/C11b.png
+C12,Proibição de versão do sentido de marcha,proibicao,17,sinais/C12.png
+C13,Proibição de exceder a velocidade máxima de ... km/h,proibicao,17,sinais/C13.png
+C14a,Proibição de ultrapassar,proibicao,17,sinais/C14a.png
+C14b,Proibição de ultrapassar para automóveis pesados,proibicao,17,sinais/C14b.png
+C14c,Proibição de ultrapassar para motociclos e ciclomotores,proibicao,17,sinais/C14c.png
+C15,Estacionamento proibido,proibicao,17,sinais/C15.png
+C16,Paragem e estacionamento proibidos,proibicao,17,sinais/C16.png
+C17,Proibição de sinais sonoros,proibicao,17,sinais/C17.png
+C18,Paragem obrigatória na alfândega,proibicao,17,sinais/C18.png
+C19,Outras paragens obrigatórias,proibicao,17,sinais/C19.png
+C20a,Fim de todas as proibições impostas anteriormente por sinalização a veículos,proibicao,17,sinais/C20a.png
+C20b,Fim da limitação de velocidade,proibicao,17,sinais/C20b.png
+C20c,Fim da proibição de ultrapassar,proibicao,17,sinais/C20c.png
+C20d,Fim da proibição de ultrapassar para automóveis pesados,proibicao,17,sinais/C20d.png
+C20e,Fim da proibição de ultrapassar para motociclos e ciclomotores,proibicao,17,sinais/C20e.png
+C21,Fim da paragem ou estacionamento proibidos,proibicao,18,sinais/C21.png
+C22,Fim da proibição de sinais sonoros,proibicao,18,sinais/C22.png
+D1a,Sentido obrigatório,obrigacao,19,sinais/D1a.png
+D1b,Sentido obrigatório,obrigacao,19,sinais/D1b.png
+D1c,Sentido obrigatório,obrigacao,19,sinais/D1c.png
+D1d,Sentido obrigatório,obrigacao,19,sinais/D1d.png
+D1e,Sentido obrigatório,obrigacao,19,sinais/D1e.png
+D2a,Sentidos obrigatórios possíveis,obrigacao,19,sinais/D2a.png
+D2b,Sentidos obrigatórios possíveis,obrigacao,19,sinais/D2b.png
+D2c,Sentidos obrigatórios possíveis,obrigacao,19,sinais/D2c.png
+D3a,Obrigação de contornar a placa ou obstáculo,obrigacao,19,sinais/D3a.png
+D3b,Obrigação de contornar a placa ou obstáculo,obrigacao,19,sinais/D3b.png
+D4,Rotunda,obrigacao,19,sinais/D4.png
+D5a,Via obrigatória para automóveis de mercadorias,obrigacao,19,sinais/D5a.png
+D5b,Via obrigatória para automóveis pesados,obrigacao,19,sinais/D5b.png
+D6,Via reservada a veículos de transporte público,obrigacao,19,sinais/D6.png
+D7a,Pista obrigatória para velocípedes,obrigacao,19,sinais/D7a.png
+D7b,Pista obrigatória para peões,obrigacao,19,sinais/D7b.png
+D7c,Pista obrigatória para cavaleiros,obrigacao,19,sinais/D7c.png
+D7d,Pista obrigatória para gado em manada,obrigacao,19,sinais/D7d.png
+D7e,Pista obrigatória para peões e velocípedes,obrigacao,19,sinais/D7e.png
+D7f,Pista obrigatória para peões e velocípedes,obrigacao,19,sinais/D7f.png
+D8,Obrigação de transitar à velocidade mínima de ... km/h,obrigacao,20,sinais/D8.png
+D9,Obrigação de utilizar correntes de neve,obrigacao,20,sinais/D9.png
+D10,Obrigação de utilizar as luzes de cruzamento (médios) acesas,obrigacao,20,sinais/D10.png
+D11a,Fim da via obrigatória para automóveis de mercadorias,obrigacao,20,sinais/D11a.png
+D11b,Fim da via obrigatória para automóveis pesados,obrigacao,20,sinais/D11b.png
+D12,Fim da via reservada a veículos de transporte público,obrigacao,20,sinais/D12.png
+D13a,Fim da pista obrigatória para velocípedes,obrigacao,20,sinais/D13a.png
+D13b,Fim da pista obrigatória para peões,obrigacao,20,sinais/D13b.png
+D13c,Fim da pista obrigatória para cavaleiros,obrigacao,20,sinais/D13c.png
+D13d,Fim da pista obrigatória para gado em manada,obrigacao,20,sinais/D13d.png
+D13e,Fim da pista obrigatória para peões e velocípedes,obrigacao,20,sinais/D13e.png
+D13f,Fim da pista obrigatória para peões e velocípedes,obrigacao,20,sinais/D13f.png
+D14,Fim da obrigação de transitar à velocidade mínima de ... km/h,obrigacao,20,sinais/D14.png
+D15,Fim da obrigação de utilizar correntes de neve,obrigacao,20,sinais/D15.png
+D16,Fim da obrigação de utilizar as luzes de cruzamento (médios) acesas,obrigacao,20,sinais/D16.png
+E2,Destinos de saída,prescricao,21,sinais/E2.png
+F1a,Aplicação de prescrição a via de trânsito,prescricao,22,sinais/F1a.png
+F1b,Aplicação de prescrição a via de trânsito,prescricao,22,sinais/F1b.png
+F1c,Aplicação de prescrição a via de trânsito,prescricao,22,sinais/F1c.png
+F2,Via de trânsito reservada a veículos de transporte público,prescricao,22,sinais/F2.png
+G1,Zona de estacionamento autorizado,zona,23,sinais/G1.png
+G2a,Zona de estacionamento proibido,zona,23,sinais/G2a.png
+G2b,Zona de estacionamento proibido,zona,23,sinais/G2b.png
+G3,Zona de paragem e estacionamento proibidos,zona,23,sinais/G3.png
+G5a,Zona de trânsito proibido,zona,23,sinais/G5a.png
+G5b,Zona de trânsito proibido,zona,24,sinais/G5b.png
+G6,Fim de zona de acionamento autorizad,zona,24,sinais/G6.png
+G7a,Fim de zona de paragem e estacionamento proibidos,zona,24,sinais/G7a.png
+G7b,Fim de zona de paragem e estacionamento proibidos,zona,24,sinais/G7b.png
+G8,Fim de zona de velocidade limitada,zona,24,sinais/G8.png
+G9,Fim de todas as proibições impostas na zona,zona,24,sinais/G9.png
+H1a,Estacionamento autorizado,informacao,25,sinais/H1a.png
+H1b,Estacionamento autorizado,informacao,25,sinais/H1b.png
+H2,Hospital,informacao,25,sinais/H2.png
+H3,Trânsito de sentido único,informacao,25,sinais/H3.png
+H4,Via pública sem saída,informacao,25,sinais/H4.png
+H5,Correntes de neve recomendadas,informacao,25,sinais/H5.png
+H6,Velocidade recomendada,informacao,25,sinais/H6.png
+H7,Passagem para peões,informacao,25,sinais/H7.png
+H8a,Passagem desnivelada para peões,informacao,25,sinais/H8a.png
+H9,Hospital com urgência médica,informacao,25,sinais/H9.png
+H10,Posto de socorros,informacao,25,sinais/H10.png
+H11,Oficina,informacao,26,sinais/H11.png
+H12,Telefone,informacao,26,sinais/H12.png
+H13a,Posto de abastecimento de combustível,informacao,26,sinais/H13a.png
+H13b,Posto de abastecimento de combustível com GPL,informacao,26,sinais/H13b.png
+H14a,Parque de campismo,informacao,26,sinais/H14a.png
+H14b,Parque para reboques de campismo,informacao,26,sinais/H14b.png
+H14c,Parque misto para campismo e reboques de campismo,informacao,26,sinais/H14c.png
+H15,Telefone de emergência,informacao,26,sinais/H15.png
+H16a,Pousada ou estalagem,informacao,26,sinais/H16a.png
+H16b,Albergue,informacao,27,sinais/H16b.png
+H16c,Pousada de juventude,informacao,27,sinais/H16c.png
+H16d,Turismo rural,informacao,27,sinais/H16d.png
+H17,Hotel,informacao,27,sinais/H17.png
+H18,Restaurante,informacao,27,sinais/H18.png
+H19,Café ou bar,informacao,27,sinais/H19.png
+H20a,Paragem de veículos de transporte colectivo de passageiros,informacao,27,sinais/H20a.png
+H20b,Paragem de veículos de transporte colectivo de passageiros que transitem sobre carris,informacao,27,sinais/H20b.png
+H20c,Paragem de veículos afectos ao transporte de crianças,informacao,27,sinais/H20c.png
+H21,Aeroporto,informacao,28,sinais/H21.png
+H22,Posto de informações,informacao,28,sinais/H22.png
+H23,Estação de radiodifusão,informacao,28,sinais/H23.png
+H24,Auto-estrada,informacao,28,sinais/H24.png
+H25,Via reservada a automóveis e motociclos,informacao,28,sinais/H25.png
+H26,Escapatória,informacao,28,sinais/H26.png
+H27,Inversão de marcha,informacao,28,sinais/H27.png
+H28,Limites de velocidade,informacao,29,sinais/H28.png
+H29a,Identificação de país,informacao,29,sinais/H29a.png
+H29b,Identificação de país,informacao,29,sinais/H29b.png
+H31a,Número e sentido das vias de trânsito,informacao,31,sinais/H31a.png
+H31b,Número e sentido das vias de trânsito,informacao,31,sinais/H31b.png
+H31c,Número e sentido das vias de trânsito,informacao,31,sinais/H31c.png
+H31d,Número e sentido das vias de trânsito,informacao,31,sinais/H31d.png
+H32,Supressão de via de trânsito,informacao,31,sinais/H32.png
+H33,Via verde,informacao,31,sinais/H33.png
+H34,Centro de inspecções,informacao,31,sinais/H34.png
+H35,Túnel,informacao,31,sinais/H35.png
+H36,Fim da recomendação do uso de correntes de neve,informacao,31,sinais/H36.png
+H37,Fim de velocidade recomendada,informacao,32,sinais/H37.png
+H38,Fim de autoestrada,informacao,32,sinais/H38.png
+H39,Fim de via reservada a automóveis e motociclos,informacao,32,sinais/H39.png
+H40,Fim de estacionamento autorizado,informacao,32,sinais/H40.png
+H41,Fim de túnel,informacao,32,sinais/H41.png
+H42,Velocidade média,informacao,32,sinais/H42.png
+I1,Pré–aviso simplificado (Intersecção desnivelada),pre_sinalizacao,33,sinais/I1.png
+I2a,Pré-aviso gráfico (Intersecção de nível),pre_sinalizacao,33,sinais/I2a.png
+I2b,Pré-aviso gráfico (Rotunda),pre_sinalizacao,33,sinais/I2b.png
+I2c,Pré-aviso gráfico (Intersecção de nível),pre_sinalizacao,33,sinais/I2c.png
+I2d,Pré-aviso gráfico (Intersecção desnivelada),pre_sinalizacao,34,sinais/I2d.png
+I2e,Pré-aviso gráfico,pre_sinalizacao,34,sinais/I2e.png
+I2f,Pré-aviso gráfico,pre_sinalizacao,34,sinais/I2f.png
+I3a,Pré-aviso reduzido,pre_sinalizacao,34,sinais/I3a.png
+I3b,Pré-aviso reduzido,pre_sinalizacao,34,sinais/I3b.png
+I4a,Aproximação de área de serviço,pre_sinalizacao,34,sinais/I4a.png
+I4b,Aproximação de via de saída para área de serviço,pre_sinalizacao,35,sinais/I4b.png
+I5a,Aproximação de área de repouso,pre_sinalizacao,35,sinais/I5a.png
+I5b,Aproximação de via de saída para uma área de repouso,pre_sinalizacao,35,sinais/I5b.png
+I7a,Pré-sinalização de via sem saída,pre_sinalizacao,36,sinais/I7a.png
+I7b,Pré-sinalização de via sem saída,pre_sinalizacao,36,sinais/I7b.png
+I8,Aproximação de travessia de crianças,pre_sinalizacao,36,sinais/I8.png
+I9a,Aproximação de passagem de nível,pre_sinalizacao,37,sinais/I9a.png
+I9b,Aproximação de passagem de nível,pre_sinalizacao,37,sinais/I9b.png
+I9c,Aproximação de passagem de nível,pre_sinalizacao,37,sinais/I9c.png
+I9d,Aproximação de passagem de nível,pre_sinalizacao,37,sinais/I9d.png
+I9e,Aproximação de passagem de nível,pre_sinalizacao,37,sinais/I9e.png
+I9f,Aproximação de passagem de nível,pre_sinalizacao,37,sinais/I9f.png
+J1,Direcção da via de saída,direcao,38,sinais/J1.png
+J2,Direcção de via de acesso,direcao,38,sinais/J2.png
+J3a,Indicação de âmbito urbano,direcao,38,sinais/J3a.png
+J3b,J3c – J3d – Indicação de âmbito urbano,direcao,38,sinais/J3b.png
+L1,Sinal de confirmação,confirmacao,39,sinais/L1.png
+O1a,Demarcação hectométrica da via - IP,outros,40,sinais/O1a.png
+O1b,Demarcação hectométrica da via – IC,outros,40,sinais/O1b.png
+O1c,Demarcação hectomét,outros,40,sinais/O1c.png
+O1d,Demarcação hectométrica da via – estradas,outros,40,sinais/O1d.png
+O2a,Demarcação ilométrica da via – A,outros,40,sinais/O2a.png
+O2b,Demarcação uilométrica da via - I,outros,40,sinais/O2b.png
+O2c,Demarcação ilométrica da via – I,outros,41,sinais/O2c.png
+O2d,Demarcação quilométrica da via – restantes estradas,outros,41,sinais/O2d.png
+O2e,Demarcação quilométrica da via – estradas municipais,outros,41,sinais/O2e.png
+O3a,Demarcação miriamétrica da via - AE,outros,41,sinais/O3a.png
+O3b,Demarcação miriamétrica da via - IP,outros,41,sinais/O3b.png
+O3c,Demarcação miriamétrica da via – IC,outros,41,sinais/O3c.png
+O3d,Demarcação miriamétrica da via – restantes estradas,outros,41,sinais/O3d.png
+O3e,Demarcação miriamétrica da via – estradas municipais,outros,41,sinais/O3e.png
+O4a,Sinal de aproximação de saída,outros,42,sinais/O4a.png
+O4b,Sinal de aproximação de saída,outros,42,sinais/O4b.png
+O4c,Sinal de aproximação de saída,outros,42,sinais/O4c.png
+O5a,Baia direccional para balizamento de pontos de divergência,outros,42,sinais/O5a.png
+O5b,Baia direccional para balizamento de pontos de divergência,outros,42,sinais/O5b.png
+O6a,Baia direccional,outros,42,sinais/O6a.png
+O6b,Baia direccional,outros,42,sinais/O6b.png
+O7a,Baliza de posição,outros,42,sinais/O7a.png
+O7b,Baliza de posição,outros,42,sinais/O7b.png
+T1,Regi,outros,46,sinais/T1.png
+T4a,Identificação de circuito,outros,47,sinais/T4a.png
+T4b,Direcção de circuito,outros,47,sinais/T4b.png
+T5a,Identificação de rota,outros,47,sinais/T5a.png
+T5b,Direcção de rota,outros,47,sinais/T5b.png
+M3,Linha mi,adicional,48,sinais/M3.png
+M8,Linha de paragem,adicional,49,sinais/M8.png
+M8a,Linha de paragem com símbolo “STOP”,adicional,49,sinais/M8a.png
+M9,Linha de cedência de passagem,adicional,49,sinais/M9.png
+M9a,Linha de cedência de passagem com símbolo triangular,adicional,49,sinais/M9a.png
+M10,Passagem para ciclistas,adicional,50,sinais/M10.png
+M10a,Passagem para ciclistas,adicional,50,sinais/M10a.png
+M11,Passagem para peões,adicional,50,sinais/M11.png
+M11a,Passagem para peões,adicional,50,sinais/M11a.png
+M12,Linha contín unto ao limite da fa de rodagem,adicional,50,sinais/M12.png
+M12a,Linha contínu sobre o bordo do passeio,adicional,50,sinais/M12a.png
+M13a,Linha descontínua sobre o bordo do passeio,adicional,51,sinais/M13a.png
+M14,Linha em ziguezague,adicional,51,sinais/M14.png
+M14a,Paragem e estacionamento para cargas e descargas,adicional,51,sinais/M14a.png
+M15,Seta de selecção,adicional,51,sinais/M15.png
+M15a,Seta de selecção,adicional,51,sinais/M15a.png
+M15b,Seta de selecção,adicional,51,sinais/M15b.png
+M15c,Seta de selecção,adicional,52,sinais/M15c.png
+M15d,Seta de selecção,adicional,52,sinais/M15d.png
+M15e,Seta de selecção,adicional,52,sinais/M15e.png
+M15f,Seta de selecção,adicional,52,sinais/M15f.png
+M16,Seta de desvio,adicional,52,sinais/M16.png
+M16a,Seta de desvio,adicional,52,sinais/M16a.png
+M16b,Seta de desvio,adicional,52,sinais/M16b.png
+M17b,Cruzamento ou entroncamento facilmente congestionável,adicional,53,sinais/M17b.png
+M18,Marcação de objectos contíguos à faixa de rodagem,adicional,53,sinais/M18.png
+M19,Guias,adicional,53,sinais/M19.png
+M20,Bandas cromáticas,adicional,53,sinais/M20.png
+M21,Marcas de segurança,adicional,54,sinais/M21.png
+ST1a,Número e sentido das vias de trânsito,outros,55,sinais/ST1a.png
+ST1b,Número e sentido das vias de trânsito,outros,55,sinais/ST1b.png
+ST1c,Número e sentido das vias de trânsito,outros,55,sinais/ST1c.png
+ST1d,Número e sentido das vias de trânsito,outros,55,sinais/ST1d.png
+ST2,Supressão de via de trânsito,outros,55,sinais/ST2.png
+ST3,Supressão da berma,outros,55,sinais/ST3.png
+ST4,Desvio de via de trânsito,outros,55,sinais/ST4.png
+ST5,Desvio para a faixa de rodagem contrária,outros,56,sinais/ST5.png
+ST9,Fim de desvio,outros,56,sinais/ST9.png
+ST10,Circulação alternada,outros,56,sinais/ST10.png
+ST11,Trânsito sujeito a demora,outros,57,sinais/ST11.png
+ST12,Telefone de emergência,outros,57,sinais/ST12.png
+ST13,Acidente,outros,57,sinais/ST13.png
+ST14,Fim de obras,outros,57,sinais/ST14.png
+ET1,Raquetas de sinalização,prescricao,58,sinais/ET1.png
+ET2,Baias direccionais,prescricao,58,sinais/ET2.png
+ET3,Baias de posição,prescricao,58,sinais/ET3.png
+ET5,Balizas de posição,prescricao,58,sinais/ET5.png
+ET6,Cone,prescricao,58,sinais/ET6.png
+ET7,Pórti,prescricao,58,sinais/ET7.png
+ET8,Conjunto de lantern sequenciais sem fios,prescricao,58,sinais/ET8.png
+ET9,Conjunto de lantern sequenciais com fios,prescricao,58,sinais/ET9.png
+ET10,Perfil móvel de plástico,prescricao,59,sinais/ET10.png
+ET11,Robot,prescricao,59,sinais/ET11.png
+ET12,Atrelado de balizamento,prescricao,59,sinais/ET12.png
+ET13,Seta luminosa,prescricao,59,sinais/ET13.png
