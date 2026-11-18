@@ -87,7 +87,7 @@ C9,Trânsito proibido a veículos de altura superior a ... m,proibicao,16,sinais
 C10,Proibição de transitar a menos de ... m do veículo precedente,proibicao,16,sinais/C10.png
 C11a,Proibição de virar à direita,proibicao,16,sinais/C11a.png
 C11b,Proibição de virar à esquerda,proibicao,17,sinais/C11b.png
-C12,Proibição de versão do sentido de marcha,proibicao,17,sinais/C12.png
+C12,Proibição de inversão do sentido de marcha,proibicao,17,sinais/C12.png
 C13,Proibição de exceder a velocidade máxima de ... km/h,proibicao,17,sinais/C13.png
 C14a,Proibição de ultrapassar,proibicao,17,sinais/C14a.png
 C14b,Proibição de ultrapassar para automóveis pesados,proibicao,17,sinais/C14b.png

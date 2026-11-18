@@ -1,6 +1,6 @@
 """
 Acesso à Mapillary (API e mosaicos) e ao limite do município (Nominatim/OSM).
-Não se corre sozinho: é usado por amostra.py, captura_sequencia.py e fetch_ground_truth.py.
+Não se corre sozinho: é usado por dados.py amostra, dados.py sequencia e dados.py referencias.
 
 As marcações e os "points" da Mapillary servem SÓ para medir; nunca entram no catálogo.
 Requer MAPILLARY_TOKEN no ficheiro .env (Client Token "MLY|...").

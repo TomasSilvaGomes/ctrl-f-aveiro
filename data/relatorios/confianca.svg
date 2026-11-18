@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 340" font-family="Segoe UI, sans-serif">
+<rect width="1280" height="340" fill="#fcfcfb"/>
+<text x="60" y="26" font-size="16" font-weight="600" fill="#0b0b0b">Sinais</text>
+<line x1="60" x2="390" y1="270" y2="270" stroke="#e6e5e0"/>
+<text x="52" y="274" font-size="11" text-anchor="end" fill="#52514e">0%</text>
+<line x1="60" x2="390" y1="212.5" y2="212.5" stroke="#e6e5e0"/>
+<text x="52" y="216.5" font-size="11" text-anchor="end" fill="#52514e">25%</text>
+<line x1="60" x2="390" y1="155.0" y2="155.0" stroke="#e6e5e0"/>
+<text x="52" y="159.0" font-size="11" text-anchor="end" fill="#52514e">50%</text>
+<line x1="60" x2="390" y1="97.5" y2="97.5" stroke="#e6e5e0"/>
+<text x="52" y="101.5" font-size="11" text-anchor="end" fill="#52514e">75%</text>
+<line x1="60" x2="390" y1="40" y2="40" stroke="#e6e5e0"/>
+<text x="52" y="44" font-size="11" text-anchor="end" fill="#52514e">100%</text>
+<text x="60.0" y="288" font-size="11" text-anchor="middle" fill="#52514e">0.1</text>
+<text x="137.6470588235294" y="288" font-size="11" text-anchor="middle" fill="#52514e">0.3</text>
+<text x="215.29411764705884" y="288" font-size="11" text-anchor="middle" fill="#52514e">0.5</text>
+<text x="292.9411764705883" y="288" font-size="11" text-anchor="middle" fill="#52514e">0.7</text>
+<text x="370.5882352941177" y="288" font-size="11" text-anchor="middle" fill="#52514e">0.9</text>
+<text x="225.0" y="308" font-size="12" text-anchor="middle" fill="#52514e">confiança mínima aceite</text>
+<line x1="234.70588235294122" x2="234.70588235294122" y1="40" y2="270" stroke="#0b0b0b" stroke-dasharray="4 3"/>
+<text x="238.70588235294122" y="52" font-size="11" fill="#0b0b0b">sugerido 0.55</text>
+<polyline points="60.0,160.0 79.4,159.9 98.8,159.4 118.2,158.1 137.6,156.3 157.1,153.9 176.5,151.3 195.9,149.2 215.3,146.1 234.7,142.0 254.1,138.9 273.5,134.0 292.9,128.8 312.4,120.5 331.8,112.1 351.2,101.5 370.6,91.8 390.0,81.4" fill="none" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="60.0" cy="160.0" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 48% com limiar 0.10</title></circle>
+<circle cx="79.4" cy="159.9" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 48% com limiar 0.15</title></circle>
+<circle cx="98.8" cy="159.4" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 48% com limiar 0.20</title></circle>
+<circle cx="118.2" cy="158.1" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 49% com limiar 0.25</title></circle>
+<circle cx="137.6" cy="156.3" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 49% com limiar 0.30</title></circle>
+<circle cx="157.1" cy="153.9" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 50% com limiar 0.35</title></circle>
+<circle cx="176.5" cy="151.3" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 52% com limiar 0.40</title></circle>
+<circle cx="195.9" cy="149.2" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 53% com limiar 0.45</title></circle>
+<circle cx="215.3" cy="146.1" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 54% com limiar 0.50</title></circle>
+<circle cx="234.7" cy="142.0" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 56% com limiar 0.55</title></circle>
+<circle cx="254.1" cy="138.9" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 57% com limiar 0.60</title></circle>
+<circle cx="273.5" cy="134.0" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 59% com limiar 0.65</title></circle>
+<circle cx="292.9" cy="128.8" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 61% com limiar 0.70</title></circle>
+<circle cx="312.4" cy="120.5" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 65% com limiar 0.75</title></circle>
+<circle cx="331.8" cy="112.1" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 69% com limiar 0.80</title></circle>
+<circle cx="351.2" cy="101.5" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 73% com limiar 0.85</title></circle>
+<circle cx="370.6" cy="91.8" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 77% com limiar 0.90</title></circle>
+<circle cx="390.0" cy="81.4" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 82% com limiar 0.95</title></circle>
+<text x="396.0" y="85.35708227311281" font-size="11" fill="#0b0b0b">precisão</text>
+<polyline points="60.0,57.2 79.4,57.2 98.8,57.2 118.2,57.8 137.6,58.8 157.1,61.3 176.5,65.0 195.9,71.1 215.3,77.2 234.7,83.7 254.1,92.7 273.5,101.0 292.9,109.9 312.4,119.1 331.8,130.3 351.2,144.4 370.6,160.4 390.0,183.8" fill="none" stroke="#eb6834" stroke-width="2"/>
+<circle cx="60.0" cy="57.2" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 93% com limiar 0.10</title></circle>
+<circle cx="79.4" cy="57.2" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 93% com limiar 0.15</title></circle>
+<circle cx="98.8" cy="57.2" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 93% com limiar 0.20</title></circle>
+<circle cx="118.2" cy="57.8" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 92% com limiar 0.25</title></circle>
+<circle cx="137.6" cy="58.8" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 92% com limiar 0.30</title></circle>
+<circle cx="157.1" cy="61.3" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 91% com limiar 0.35</title></circle>
+<circle cx="176.5" cy="65.0" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 89% com limiar 0.40</title></circle>
+<circle cx="195.9" cy="71.1" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 86% com limiar 0.45</title></circle>
+<circle cx="215.3" cy="77.2" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 84% com limiar 0.50</title></circle>
+<circle cx="234.7" cy="83.7" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 81% com limiar 0.55</title></circle>
+<circle cx="254.1" cy="92.7" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 77% com limiar 0.60</title></circle>
+<circle cx="273.5" cy="101.0" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 73% com limiar 0.65</title></circle>
+<circle cx="292.9" cy="109.9" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 70% com limiar 0.70</title></circle>
+<circle cx="312.4" cy="119.1" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 66% com limiar 0.75</title></circle>
+<circle cx="331.8" cy="130.3" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 61% com limiar 0.80</title></circle>
+<circle cx="351.2" cy="144.4" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 55% com limiar 0.85</title></circle>
+<circle cx="370.6" cy="160.4" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 48% com limiar 0.90</title></circle>
+<circle cx="390.0" cy="183.8" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 37% com limiar 0.95</title></circle>
+<text x="396.0" y="187.77220077220076" font-size="11" fill="#0b0b0b">encontra</text>
+<text x="460" y="26" font-size="16" font-weight="600" fill="#0b0b0b">Iluminação</text>
+<line x1="460" x2="790" y1="270" y2="270" stroke="#e6e5e0"/>
+<text x="452" y="274" font-size="11" text-anchor="end" fill="#52514e">0%</text>
+<line x1="460" x2="790" y1="212.5" y2="212.5" stroke="#e6e5e0"/>
+<text x="452" y="216.5" font-size="11" text-anchor="end" fill="#52514e">25%</text>
+<line x1="460" x2="790" y1="155.0" y2="155.0" stroke="#e6e5e0"/>
+<text x="452" y="159.0" font-size="11" text-anchor="end" fill="#52514e">50%</text>
+<line x1="460" x2="790" y1="97.5" y2="97.5" stroke="#e6e5e0"/>
+<text x="452" y="101.5" font-size="11" text-anchor="end" fill="#52514e">75%</text>
+<line x1="460" x2="790" y1="40" y2="40" stroke="#e6e5e0"/>
+<text x="452" y="44" font-size="11" text-anchor="end" fill="#52514e">100%</text>
+<text x="460.0" y="288" font-size="11" text-anchor="middle" fill="#52514e">0.1</text>
+<text x="537.6470588235294" y="288" font-size="11" text-anchor="middle" fill="#52514e">0.3</text>
+<text x="615.2941176470588" y="288" font-size="11" text-anchor="middle" fill="#52514e">0.5</text>
+<text x="692.9411764705883" y="288" font-size="11" text-anchor="middle" fill="#52514e">0.7</text>
+<text x="770.5882352941177" y="288" font-size="11" text-anchor="middle" fill="#52514e">0.9</text>
+<text x="625.0" y="308" font-size="12" text-anchor="middle" fill="#52514e">confiança mínima aceite</text>
+<line x1="654.1176470588235" x2="654.1176470588235" y1="40" y2="270" stroke="#0b0b0b" stroke-dasharray="4 3"/>
+<text x="658.1176470588235" y="52" font-size="11" fill="#0b0b0b">sugerido 0.60</text>
+<polyline points="460.0,208.5 479.4,208.5 498.8,208.3 518.2,207.0 537.6,204.6 557.1,200.8 576.5,195.0 595.9,186.8 615.3,178.5 634.7,169.6 654.1,159.1 673.5,148.3 692.9,136.0 712.4,121.2 731.8,104.6 751.2,88.2 770.6,77.4 790.0,64.0" fill="none" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="460.0" cy="208.5" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 27% com limiar 0.10</title></circle>
+<circle cx="479.4" cy="208.5" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 27% com limiar 0.15</title></circle>
+<circle cx="498.8" cy="208.3" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 27% com limiar 0.20</title></circle>
+<circle cx="518.2" cy="207.0" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 27% com limiar 0.25</title></circle>
+<circle cx="537.6" cy="204.6" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 28% com limiar 0.30</title></circle>
+<circle cx="557.1" cy="200.8" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 30% com limiar 0.35</title></circle>
+<circle cx="576.5" cy="195.0" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 33% com limiar 0.40</title></circle>
+<circle cx="595.9" cy="186.8" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 36% com limiar 0.45</title></circle>
+<circle cx="615.3" cy="178.5" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 40% com limiar 0.50</title></circle>
+<circle cx="634.7" cy="169.6" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 44% com limiar 0.55</title></circle>
+<circle cx="654.1" cy="159.1" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 48% com limiar 0.60</title></circle>
+<circle cx="673.5" cy="148.3" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 53% com limiar 0.65</title></circle>
+<circle cx="692.9" cy="136.0" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 58% com limiar 0.70</title></circle>
+<circle cx="712.4" cy="121.2" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 65% com limiar 0.75</title></circle>
+<circle cx="731.8" cy="104.6" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 72% com limiar 0.80</title></circle>
+<circle cx="751.2" cy="88.2" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 79% com limiar 0.85</title></circle>
+<circle cx="770.6" cy="77.4" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 84% com limiar 0.90</title></circle>
+<circle cx="790.0" cy="64.0" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 90% com limiar 0.95</title></circle>
+<text x="796.0" y="67.95833333333331" font-size="11" fill="#0b0b0b">precisão</text>
+<polyline points="460.0,158.0 479.4,158.0 498.8,158.1 518.2,158.8 537.6,161.1 557.1,164.1 576.5,167.7 595.9,172.3 615.3,177.4 634.7,183.0 654.1,187.9 673.5,193.2 692.9,198.8 712.4,205.3 731.8,212.7 751.2,222.3 770.6,234.5 790.0,247.1" fill="none" stroke="#eb6834" stroke-width="2"/>
+<circle cx="460.0" cy="158.0" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 49% com limiar 0.10</title></circle>
+<circle cx="479.4" cy="158.0" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 49% com limiar 0.15</title></circle>
+<circle cx="498.8" cy="158.1" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 49% com limiar 0.20</title></circle>
+<circle cx="518.2" cy="158.8" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 48% com limiar 0.25</title></circle>
+<circle cx="537.6" cy="161.1" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 47% com limiar 0.30</title></circle>
+<circle cx="557.1" cy="164.1" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 46% com limiar 0.35</title></circle>
+<circle cx="576.5" cy="167.7" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 44% com limiar 0.40</title></circle>
+<circle cx="595.9" cy="172.3" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 42% com limiar 0.45</title></circle>
+<circle cx="615.3" cy="177.4" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 40% com limiar 0.50</title></circle>
+<circle cx="634.7" cy="183.0" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 38% com limiar 0.55</title></circle>
+<circle cx="654.1" cy="187.9" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 36% com limiar 0.60</title></circle>
+<circle cx="673.5" cy="193.2" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 33% com limiar 0.65</title></circle>
+<circle cx="692.9" cy="198.8" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 31% com limiar 0.70</title></circle>
+<circle cx="712.4" cy="205.3" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 28% com limiar 0.75</title></circle>
+<circle cx="731.8" cy="212.7" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 25% com limiar 0.80</title></circle>
+<circle cx="751.2" cy="222.3" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 21% com limiar 0.85</title></circle>
+<circle cx="770.6" cy="234.5" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 15% com limiar 0.90</title></circle>
+<circle cx="790.0" cy="247.1" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 10% com limiar 0.95</title></circle>
+<text x="796.0" y="251.0966386554622" font-size="11" fill="#0b0b0b">encontra</text>
+<text x="860" y="26" font-size="16" font-weight="600" fill="#0b0b0b">Contentores</text>
+<line x1="860" x2="1190" y1="270" y2="270" stroke="#e6e5e0"/>
+<text x="852" y="274" font-size="11" text-anchor="end" fill="#52514e">0%</text>
+<line x1="860" x2="1190" y1="212.5" y2="212.5" stroke="#e6e5e0"/>
+<text x="852" y="216.5" font-size="11" text-anchor="end" fill="#52514e">25%</text>
+<line x1="860" x2="1190" y1="155.0" y2="155.0" stroke="#e6e5e0"/>
+<text x="852" y="159.0" font-size="11" text-anchor="end" fill="#52514e">50%</text>
+<line x1="860" x2="1190" y1="97.5" y2="97.5" stroke="#e6e5e0"/>
+<text x="852" y="101.5" font-size="11" text-anchor="end" fill="#52514e">75%</text>
+<line x1="860" x2="1190" y1="40" y2="40" stroke="#e6e5e0"/>
+<text x="852" y="44" font-size="11" text-anchor="end" fill="#52514e">100%</text>
+<text x="860.0" y="288" font-size="11" text-anchor="middle" fill="#52514e">0.1</text>
+<text x="937.6470588235294" y="288" font-size="11" text-anchor="middle" fill="#52514e">0.3</text>
+<text x="1015.2941176470588" y="288" font-size="11" text-anchor="middle" fill="#52514e">0.5</text>
+<text x="1092.9411764705883" y="288" font-size="11" text-anchor="middle" fill="#52514e">0.7</text>
+<text x="1170.5882352941176" y="288" font-size="11" text-anchor="middle" fill="#52514e">0.9</text>
+<text x="1025.0" y="308" font-size="12" text-anchor="middle" fill="#52514e">confiança mínima aceite</text>
+<line x1="995.8823529411765" x2="995.8823529411765" y1="40" y2="270" stroke="#0b0b0b" stroke-dasharray="4 3"/>
+<text x="999.8823529411765" y="52" font-size="11" fill="#0b0b0b">sugerido 0.45</text>
+<polyline points="860.0,152.9 879.4,152.9 898.8,152.7 918.2,151.2 937.6,147.6 957.1,143.9 976.5,138.8 995.9,134.3 1015.3,130.6 1034.7,126.1 1054.1,120.5 1073.5,116.7 1092.9,111.6 1112.4,106.8 1131.8,101.2 1151.2,97.6 1170.6,90.8 1190.0,88.0" fill="none" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="860.0" cy="152.9" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 51% com limiar 0.10</title></circle>
+<circle cx="879.4" cy="152.9" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 51% com limiar 0.15</title></circle>
+<circle cx="898.8" cy="152.7" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 51% com limiar 0.20</title></circle>
+<circle cx="918.2" cy="151.2" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 52% com limiar 0.25</title></circle>
+<circle cx="937.6" cy="147.6" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 53% com limiar 0.30</title></circle>
+<circle cx="957.1" cy="143.9" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 55% com limiar 0.35</title></circle>
+<circle cx="976.5" cy="138.8" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 57% com limiar 0.40</title></circle>
+<circle cx="995.9" cy="134.3" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 59% com limiar 0.45</title></circle>
+<circle cx="1015.3" cy="130.6" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 61% com limiar 0.50</title></circle>
+<circle cx="1034.7" cy="126.1" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 63% com limiar 0.55</title></circle>
+<circle cx="1054.1" cy="120.5" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 65% com limiar 0.60</title></circle>
+<circle cx="1073.5" cy="116.7" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 67% com limiar 0.65</title></circle>
+<circle cx="1092.9" cy="111.6" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 69% com limiar 0.70</title></circle>
+<circle cx="1112.4" cy="106.8" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 71% com limiar 0.75</title></circle>
+<circle cx="1131.8" cy="101.2" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 73% com limiar 0.80</title></circle>
+<circle cx="1151.2" cy="97.6" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 75% com limiar 0.85</title></circle>
+<circle cx="1170.6" cy="90.8" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 78% com limiar 0.90</title></circle>
+<circle cx="1190.0" cy="88.0" r="3.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="1.5"><title>precisão 79% com limiar 0.95</title></circle>
+<text x="1196.0" y="92.04915514592935" font-size="11" fill="#0b0b0b">precisão</text>
+<polyline points="860.0,108.1 879.4,108.1 898.8,108.1 918.2,108.6 937.6,108.9 957.1,110.2 976.5,111.4 995.9,113.6 1015.3,118.8 1034.7,124.5 1054.1,129.7 1073.5,134.6 1092.9,140.4 1112.4,147.0 1131.8,156.0 1151.2,165.6 1170.6,174.8 1190.0,187.1" fill="none" stroke="#eb6834" stroke-width="2"/>
+<circle cx="860.0" cy="108.1" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 70% com limiar 0.10</title></circle>
+<circle cx="879.4" cy="108.1" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 70% com limiar 0.15</title></circle>
+<circle cx="898.8" cy="108.1" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 70% com limiar 0.20</title></circle>
+<circle cx="918.2" cy="108.6" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 70% com limiar 0.25</title></circle>
+<circle cx="937.6" cy="108.9" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 70% com limiar 0.30</title></circle>
+<circle cx="957.1" cy="110.2" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 69% com limiar 0.35</title></circle>
+<circle cx="976.5" cy="111.4" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 69% com limiar 0.40</title></circle>
+<circle cx="995.9" cy="113.6" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 68% com limiar 0.45</title></circle>
+<circle cx="1015.3" cy="118.8" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 66% com limiar 0.50</title></circle>
+<circle cx="1034.7" cy="124.5" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 63% com limiar 0.55</title></circle>
+<circle cx="1054.1" cy="129.7" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 61% com limiar 0.60</title></circle>
+<circle cx="1073.5" cy="134.6" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 59% com limiar 0.65</title></circle>
+<circle cx="1092.9" cy="140.4" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 56% com limiar 0.70</title></circle>
+<circle cx="1112.4" cy="147.0" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 53% com limiar 0.75</title></circle>
+<circle cx="1131.8" cy="156.0" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 50% com limiar 0.80</title></circle>
+<circle cx="1151.2" cy="165.6" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 45% com limiar 0.85</title></circle>
+<circle cx="1170.6" cy="174.8" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 41% com limiar 0.90</title></circle>
+<circle cx="1190.0" cy="187.1" r="3.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="1.5"><title>encontra 36% com limiar 0.95</title></circle>
+<text x="1196.0" y="191.08019191226867" font-size="11" fill="#0b0b0b">encontra</text>
+</svg>

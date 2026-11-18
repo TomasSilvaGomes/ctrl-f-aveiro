@@ -1,14 +1,14 @@
 # Triangulação multivista (piloto)
 
-2837 deteções · 3 passagens.
+3171 deteções · 3 passagens.
 
 ## 1. Quantos objetos foram triangulados?
 
 | Categoria | Objetos | Triangulados | % | Fotos por objeto | Desvio típico das linhas |
 |---|---|---|---|---|---|
-| Sinais | 636 | 291 | 46% | 5 | 0,0 m |
-| Iluminação | 97 | 25 | 26% | 2 | 0,0 m |
-| Contentores | 71 | 34 | 48% | 4 | 0,1 m |
+| Sinais | 618 | 278 | 45% | 5 | 0,0 m |
+| Iluminação | 225 | 102 | 45% | 3 | 0,1 m |
+| Contentores | 80 | 36 | 45% | 4 | 0,0 m |
 
 *Triangulado = visto em >= 2 fotos afastadas, com linhas a cruzarem-se. Desvio = quanto as linhas falham o ponto (menor = mais coerente).*
 
@@ -18,9 +18,9 @@ Comparação de cada foto com a distância medida pela triangulação (só objet
 
 | Categoria | Fotos | Erro típico | Erra até 2 m | Tendência |
 |---|---|---|---|---|
-| Sinais | 1818 | 1,7 m | 56% | mais perto (0,4 m) |
-| Iluminação | 64 | 2,5 m | 41% | mais longe (0,4 m) |
-| Contentores | 182 | 2,2 m | 49% | mais longe (0,4 m) |
+| Sinais | 1753 | 0,2 m | 82% | mais perto (0,0 m) |
+| Iluminação | 383 | 0,8 m | 67% | mais longe (0,0 m) |
+| Contentores | 207 | 1,4 m | 65% | mais perto (1,0 m) |
 
 *Erro típico = metade das fotos erra menos do que isto. Tendência = se uma só foto costuma pôr o objeto mais longe ou mais perto do que ele está.*
 
@@ -28,9 +28,9 @@ Comparação de cada foto com a distância medida pela triangulação (só objet
 
 | Categoria | Objetos nas 2 passagens | Diferença típica | Diferença até 1 m |
 |---|---|---|---|
-| Sinais | 91 | 0,2 m | 93% |
-| Iluminação | 5 | 0,5 m | 60% |
-| Contentores | 6 | 0,3 m | 67% |
+| Sinais | 89 | 0,1 m | 91% |
+| Iluminação | 28 | 0,5 m | 75% |
+| Contentores | 11 | 1,2 m | 45% |
 
 *O mesmo objeto, triangulado com fotos de dias diferentes. Diferença pequena = medição repetível.*
 
@@ -38,8 +38,8 @@ Comparação de cada foto com a distância medida pela triangulação (só objet
 
 | Categoria | 1 foto: até 5 m | Triangulado: até 5 m | 1 foto: erro típico | Triangulado: erro típico |
 |---|---|---|---|---|
-| Sinais | 76% | 78% | 2,7 m | 0,5 m |
-| Iluminação | 67% | 75% | 3,2 m | 1,4 m |
-| Contentores | 57% | 65% | 2,9 m | 0,7 m |
+| Sinais | 74% | 77% | 0,8 m | 0,5 m |
+| Iluminação | 74% | 76% | 1,2 m | 1,0 m |
+| Contentores | 62% | 59% | 1,8 m | 1,1 m |
 
 *Mesmos objetos. A referência também erra alguns metros: serve para comparar, não é a verdade.*

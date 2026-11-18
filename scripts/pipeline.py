@@ -1,16 +1,19 @@
 """
-Corre a pipeline toda, por ordem, com um só comando (cada passo é um script que também se
-pode correr sozinho):
+Corre a pipeline toda, por ordem, com um só comando (cada passo também se corre sozinho):
 
-  1. detetar      run_detector.py      encontra objetos (OWLv2)                 ~12 min com GPU
-  2. classificar  classify_subtype.py  tipo de cada objeto; descarta o resto (SigLIP)
-                                       (só calcula os recortes novos: memória siglip_cache.npz)
-  3. limites      ler_limites.py       número dos limites de velocidade (SigLIP)
-  4. posicao      geolocate.py         posição no mapa (1 foto)
-  5. catalogo     build_catalog.py     junta repetidos, ilhas de reciclagem -> GeoJSON + CSV
-  6. triangulacao triangulacao.py      (só com --triangulacao) posição com várias fotos seguidas
-  7. relatorio    analisa_erros.py     relatório de erros (se houver marcações Mapillary)
-  8. imagens      visualize.py final   (só com --imagens N) N fotos com as caixas
+  passo         comando                        o que faz
+  detetar       detetar.py                     encontra objetos (OWLv2)            ~12 min com GPU
+  classificar   classificar.py                 tipo de cada objeto; descarta o resto (SigLIP)
+  limites       sinais.py limites              número dos limites de velocidade
+  codigo        sinais.py codigo               código e nome oficial do Guia da DGV (A25 ...)
+  contorno      posicao.py contorno            contorno SAM 2: pé real e pontos 3D do objeto
+  posicao       posicao.py calcular            posição no mapa com 1 foto
+  catalogo      catalogo.py                    junta repetidos, ilhas de reciclagem -> GeoJSON + CSV
+  triangulacao  posicao.py triangulacao        (só com --triangulacao) posição com fotos seguidas
+  relatorio     avaliar.py erros               relatório de erros (se houver marcações Mapillary)
+  imagens       imagens.py final               (só com --imagens N) N fotos com as caixas
+
+Antes (uma vez): dados.py modelos · dados.py amostra ... · dados.py referencias · dados.py poses
 
 Uso:
     python scripts/pipeline.py                                  # tudo, amostra principal
@@ -30,7 +33,7 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-STEPS = ["detetar", "classificar", "limites", "posicao", "catalogo", "triangulacao", "relatorio", "imagens"]
+STEPS = ["detetar", "classificar", "limites", "codigo", "contorno", "posicao", "catalogo", "triangulacao", "relatorio", "imagens"]
 
 
 def main():
@@ -52,14 +55,16 @@ def main():
 
     det_args = (["--apenas-frontais"] if args.apenas_frontais else []) + (["--sem-tiling"] if args.sem_tiling else [])
     plan = {
-        "detetar": ["run_detector.py", *det_args],
-        "classificar": ["classify_subtype.py"],
-        "limites": ["ler_limites.py"],
-        "posicao": ["geolocate.py"],
-        "catalogo": ["build_catalog.py"],
-        "triangulacao": ["triangulacao.py"] if args.triangulacao else None,
-        "relatorio": ["analisa_erros.py"] if has_refs else None,
-        "imagens": ["visualize.py", "final", "--n", str(args.imagens)] if args.imagens else None,
+        "detetar": ["detetar.py", *det_args],
+        "classificar": ["classificar.py"],
+        "limites": ["sinais.py", "limites"],
+        "codigo": ["sinais.py", "codigo"],
+        "contorno": ["posicao.py", "contorno"],
+        "posicao": ["posicao.py", "calcular"],
+        "catalogo": ["catalogo.py"],
+        "triangulacao": ["posicao.py", "triangulacao"] if args.triangulacao else None,
+        "relatorio": ["avaliar.py", "erros"] if has_refs else None,
+        "imagens": ["imagens.py", "final", "--n", str(args.imagens)] if args.imagens else None,
     }
     todo = STEPS[STEPS.index(args.desde): STEPS.index(args.ate) + 1]
     print(f"Dados: {data}\nPassos: " + " → ".join(s for s in todo if plan[s]))

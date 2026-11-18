@@ -46,7 +46,7 @@ Trocas mais frequentes:
 
 ## 3. Lê o número do limite de velocidade?
 
-O número é lido pelo SigLIP num "print" do sinal (vista normal, ampliada 4×), no passo ler_limites.py. Duas verificações:
+O número é lido pelo SigLIP num "print" do sinal (vista normal, ampliada 4×), no passo sinais.py limites. Duas verificações:
 
 **3.1 Contra as marcações da Mapillary nas fotos**
 
@@ -94,9 +94,9 @@ Números de referência nesta amostra: . A maioria das ruas da cidade é de 30 k
 
 | Categoria | Objetos medidos | Acertam até 5 m | Acertam até 10 m | Erro típico |
 |---|---|---|---|---|
-| Sinais | 118 | 58% | 88% | 4,2 m |
-| Iluminação | 287 | 26% | 76% | 7,5 m |
-| Contentores | 10 | 20% | 80% | 8,4 m |
+| Sinais | 225 | 54% | 81% | 4,7 m |
+| Iluminação | 390 | 29% | 73% | 7,3 m |
+| Contentores | 10 | 60% | 100% | 2,7 m |
 
 *Acertam até 5 m = % de objetos a 5 metros ou menos do sítio certo (os restantes falham). Erro típico = metade dos objetos erra menos do que isto.*
 
@@ -104,9 +104,9 @@ Números de referência nesta amostra: . A maioria das ruas da cidade é de 30 k
 
 | Margem aceite | Sinais | Iluminação | Contentores |
 |---|---|---|---|
-| até 2 m | 21% | 5% | 10% |
-| até 5 m | 58% | 26% | 20% |
-| até 10 m | 88% | 76% | 80% |
+| até 2 m | 14% | 4% | 40% |
+| até 5 m | 54% | 29% | 60% |
+| até 10 m | 81% | 73% | 100% |
 | até 20 m | 100% | 100% | 100% |
 
 *Cada valor = % de objetos que ficam dentro dessa margem. A taxa de falha é o resto até 100%.*
@@ -115,9 +115,9 @@ Números de referência nesta amostra: . A maioria das ruas da cidade é de 30 k
 
 | Categoria | Objeto perto (até 10 m) | Objeto longe (mais de 10 m) |
 |---|---|---|
-| Sinais | 85% | 55% |
-| Iluminação | 62% | 25% |
-| Contentores | 0% | 25% |
+| Sinais | 83% | 53% |
+| Iluminação | 0% | 29% |
+| Contentores | — | 60% |
 
 *Valores = % que acertam até 5 m. Objetos perto da câmara ficam mais bem posicionados.*
 
@@ -125,9 +125,9 @@ Números de referência nesta amostra: . A maioria das ruas da cidade é de 30 k
 
 | Categoria | Foto 360° | Foto frontal |
 |---|---|---|
-| Sinais | — | 58% |
-| Iluminação | — | 26% |
-| Contentores | — | 20% |
+| Sinais | — | 54% |
+| Iluminação | — | 29% |
+| Contentores | — | 60% |
 
 *Valores = % que acertam até 5 m. As fotos 360° (recentes) posicionam melhor.*
 
@@ -135,9 +135,9 @@ Números de referência nesta amostra: . A maioria das ruas da cidade é de 30 k
 
 | Categoria | Erro típico do sistema | Erro típico ao acaso | Melhor que o acaso? |
 |---|---|---|---|
-| Sinais | 4,2 m | 9,4 m | sim |
-| Iluminação | 7,5 m | 9,4 m | não |
-| Contentores | 8,4 m | 10,0 m | não |
+| Sinais | 4,7 m | 10,9 m | sim |
+| Iluminação | 7,3 m | 10,9 m | só um pouco |
+| Contentores | 2,7 m | 11,0 m | sim |
 
 *Ao acaso = o mesmo objeto à mesma distância da câmara, mas numa direção sorteada. Se o sistema não for bem melhor do que isto, o número é sorte.*
 
@@ -145,19 +145,21 @@ Números de referência nesta amostra: . A maioria das ruas da cidade é de 30 k
 
 | Categoria | Erro na distância à câmara | Erro na direção |
 |---|---|---|
-| Sinais | 2,8 m | 1,7 m |
-| Iluminação | 5,7 m | 2,8 m |
-| Contentores | 6,6 m | 1,5 m |
+| Sinais | 2,7 m | 2,3 m |
+| Iluminação | 5,5 m | 2,9 m |
+| Contentores | 0,9 m | 1,6 m |
 
 *Valores típicos. A direção está bem medida; o que falha é a distância. A triangulação (usar várias fotos) corrige isto.*
+
+Não medidos, por não haver referência a menos de 20 m: sinais 1.
 
 
 ## 5. Há registos repetidos no catálogo?
 
 | Categoria | Objetos repetidos | Registos por objeto |
 |---|---|---|
-| Sinais | 30% | 1,4 |
-| Iluminação | 35% | 1,5 |
+| Sinais | 46% | 1,6 |
+| Iluminação | 40% | 1,5 |
 | Contentores | 0% | 1,0 |
 
 *Objetos repetidos = % de objetos reais com mais de um registo no catálogo. Registos por objeto: o ideal é 1,0.*

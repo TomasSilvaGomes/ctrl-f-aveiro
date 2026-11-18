@@ -1,13 +1,13 @@
 # Triangulação multivista (piloto)
 
-414 deteções · 1 passagens.
+739 deteções · 1 passagens.
 
 ## 1. Quantos objetos foram triangulados?
 
 | Categoria | Objetos | Triangulados | % | Fotos por objeto | Desvio típico das linhas |
 |---|---|---|---|---|---|
-| Sinais | 56 | 30 | 54% | 6 | 0,0 m |
-| Iluminação | 38 | 17 | 45% | 3 | 0,0 m |
+| Sinais | 46 | 26 | 57% | 8 | 0,0 m |
+| Iluminação | 103 | 45 | 44% | 6 | 0,1 m |
 | Contentores | 24 | 11 | 46% | 7 | 0,1 m |
 
 *Triangulado = visto em >= 2 fotos afastadas, com linhas a cruzarem-se. Desvio = quanto as linhas falham o ponto (menor = mais coerente).*
@@ -18,9 +18,9 @@ Comparação de cada foto com a distância medida pela triangulação (só objet
 
 | Categoria | Fotos | Erro típico | Erra até 2 m | Tendência |
 |---|---|---|---|---|
-| Sinais | 175 | 1,9 m | 53% | mais longe (0,8 m) |
-| Iluminação | 69 | 4,0 m | 29% | mais longe (1,5 m) |
-| Contentores | 80 | 2,0 m | 50% | mais perto (0,4 m) |
+| Sinais | 169 | 0,1 m | 88% | mais perto (0,0 m) |
+| Iluminação | 339 | 0,5 m | 76% | mais longe (0,1 m) |
+| Contentores | 95 | 0,8 m | 75% | mais perto (0,8 m) |
 
 *Erro típico = metade das fotos erra menos do que isto. Tendência = se uma só foto costuma pôr o objeto mais longe ou mais perto do que ele está.*
 
@@ -35,8 +35,8 @@ Comparação de cada foto com a distância medida pela triangulação (só objet
 
 | Categoria | 1 foto: até 5 m | Triangulado: até 5 m | 1 foto: erro típico | Triangulado: erro típico |
 |---|---|---|---|---|
-| Sinais | 64% | 70% | 2,9 m | 0,5 m |
-| Iluminação | 57% | 71% | 4,3 m | 0,5 m |
-| Contentores | 85% | 91% | 1,8 m | 0,4 m |
+| Sinais | 69% | 73% | 0,5 m | 0,5 m |
+| Iluminação | 77% | 57% | 1,1 m | 1,6 m |
+| Contentores | 96% | 91% | 0,7 m | 0,4 m |
 
 *Mesmos objetos. A referência também erra alguns metros: serve para comparar, não é a verdade.*

@@ -15,14 +15,22 @@
 
 # Frases do DETETOR (OWLv2, máx. 16 tokens) por categoria. O detetor só encontra a
 # categoria; o subtipo é decidido depois pelo SigLIP (prompts de cada subtipo).
-# Escolha das frases: scripts/escolhe_prompts.py.
+# Escolha das frases: scripts/avaliar.py prompts.
 detetor:
   sinalizacao: ["a traffic sign", "a stop sign", "a yield sign", "a speed limit sign"]
-  # Escolhidas por escolhe_prompts.py (17/11). Iluminação encontrada, rua seguida / outra rua:
+  # Escolhidas por avaliar.py prompts (17/11). Iluminação encontrada, rua seguida / outra rua:
   #   "a lamp"+"a utility pole" 21% / 7% · "a street light"+"a lamp post" 50% / 60% · estas 50% / 62%
   iluminacao: ["a decorative street lamp", "a wall-mounted street lamp", "an ornamental street lamp", "a lamppost"]
   # Contentores: as frases CCAS não ganharam (53% vs 51% numa rua, 18% vs 20% na outra) -> ficam estas.
   residuos: ["a trash bin", "a waste container", "a recycling container"]
+
+# Confiança mínima para um objeto ser aceite (catálogo, triangulação e imagens).
+# Escolhida por avaliar.py confianca (18/11): o limiar que menos perde em todas as amostras
+# (amostra principal + 3 ruas), medindo por objeto contra os pontos Mapillary/OSM.
+confianca_minima:
+  sinalizacao: 0.30
+  iluminacao: 0.40
+  residuos: 0.30
 
 categorias:
   sinalizacao:
@@ -110,8 +118,8 @@ categorias:
     #  - Candeeiro: lanterna decorativa de estilo antigo, presa à parede (braço de
     #    ferro forjado) ou em poste curto ornamentado, muitas vezes com 2 lanternas.
     # Postes de eletricidade/telecomunicações: descartar (estão nos negativos).
-    # Frases escolhidas por escolhe_prompts.py (fase 1, 30 fotos de referência) e
-    # confirmadas na auditoria visual (escolhe_prompts.py auditar, 17/11): iluminação certa
+    # Frases escolhidas por avaliar.py prompts (fase 1, 30 fotos de referência) e
+    # confirmadas na auditoria visual (avaliar.py prompts auditar, 17/11): iluminação certa
     # 74% vs 48% com "a lamp"/"a utility pole".
     subtipos:
       - id: poste_iluminacao
@@ -120,7 +128,11 @@ categorias:
         mapillary: ["object--street-light"]   # a Mapillary marca só a cabeça (luminária)
         prompts: ["a modern street light on a tall grey metal pole",
                   "a tall street light pole",
-                  "a tall slim metal street light pole with a lamp head at the top"]
+                  "a tall slim metal street light pole with a lamp head at the top",
+                  # luminária moderna vista só pela cabeça (braço no poste ou na parede): não é
+                  # candeeiro (definição dos mentores: candeeiro = lanterna decorativa)
+                  "a modern street light head on a metal arm",
+                  "a modern street light mounted on a building wall with a metal arm"]
       - id: candeeiro
         label: Candeeiro
         codigo: highway=street_lamp   # + lamp_mount=wall_mounted quando está na parede
@@ -163,13 +175,29 @@ categorias:
                   "a large round grey semi-underground waste container with a dark dome lid"]
 
 agrupamentos:
-  ilha_reciclagem:
-    label: Ilha de reciclagem (ecoponto)
-    codigo: amenity=recycling
+  # Contentores a <= raio_m entre si formam UMA ilha (vários resíduos no mesmo espaço).
+  # Nome pela composição: tipos diferentes juntos (ou ecopontos) = reciclagem; só subterrâneos;
+  # só indiferenciados. min_membros = contentores precisos para ser ilha. Cada contentor fica
+  # em "itens" no catálogo (a app abre-os ao carregar na ilha).
+  ilha:
     categoria: residuos
-    membros: [ilha_reciclagem]
-    raio_m: 8          # contentores a <= 8 m entre si formam uma ilha
-    min_membros: 1
+    raio_m: 8
+    tipos:
+      reciclagem:
+        subtipo: ilha_reciclagem
+        label: Ilha de reciclagem (ecoponto)
+        codigo: amenity=recycling
+        min_membros: 1
+      subterraneos:
+        subtipo: ilha_subterraneos
+        label: Ilha de contentores subterrâneos
+        codigo: amenity=waste_disposal;location=underground
+        min_membros: 2
+      indiferenciados:
+        subtipo: ilha_indiferenciados
+        label: Ilha de contentores indiferenciados
+        codigo: amenity=waste_disposal
+        min_membros: 2
 
 
 negativos:

@@ -7,8 +7,9 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 
-# Documentos locais (PDFs do desafio/DGV e páginas de apoio): não se publicam
-/docs
+# PDFs do desafio/DGV não se publicam; manter o registo de licenças versionado
+docs/*.html
+docs/img/
 /pdfs
 
 # Dados pesados ou que se voltam a gerar (ver README: "Descarregar as fotos")
@@ -17,8 +18,19 @@ data/*/images/
 data/viz/
 data/*/viz/
 data/**/siglip_cache.npz
+data/referencias/banco_*.npz
+data/**/sfm/
+# folhas de recortes de fotos sem autor/link por recorte (CC BY-SA): ficam só locais
+data/**/relatorios/confianca_*.jpg
+data/preds/owlv2.jsonl
 data/**/*.antes*
 data/piloto_*/ground_truth/*.geojson
 *.zip
 # candidatas da web ainda NÃO revistas (as boas passam para data/referencias/classes)
 data/referencias/recolha_web/
+
+# Experiências (ex.: YOLO-World, licença GPL/AGPL): fora do repositório até haver decisão
+/experiencias/
+
+# pesos descarregados automaticamente (ex.: CLIP ViT-B/32 do YOLO-World)
+/weights/
