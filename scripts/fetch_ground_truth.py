@@ -1,40 +1,45 @@
 """
-Descarrega pontos de referência (verificação) para o concelho:
+Pontos de referência do concelho, SÓ para medir (nunca entram no catálogo; ODbL/Mapillary):
   1. OpenStreetMap (Overpass): candeeiros, ecopontos, contentores, sinais.
-  2. Mapillary map features (vector tiles): pontos já triangulados pela
-     Mapillary para candeeiros, contentores, postes e sinais.
+  2. Mapillary "points" (map features): objetos já posicionados pela Mapillary
+     (candeeiros, contentores, postes, sinais). Poste com luminária a <= 4 m = poste de luz.
 
-Ambos servem APENAS para validar os nossos resultados (ver docs/LICENCAS.md):
-nunca são copiados para o catálogo.
+  --listar-tipos   em vez de descarregar, lista TODOS os tipos de points que a Mapillary tem
+                   no município, com quantos há de cada (-> data/relatorios/pontos_mapillary.md)
 
 Uso:
     python scripts/fetch_ground_truth.py
+    python scripts/fetch_ground_truth.py --listar-tipos --municipio Ílhavo
 """
 
 from __future__ import annotations
 
+import argparse
 import json
+import math
 import os
 import sys
 import time
 from collections import Counter
 
 import mercantile
-import requests
 from shapely.geometry import Point
 from shapely.prepared import prep
 
 sys.path.insert(0, os.path.dirname(__file__))
-from estimate_mapillary import DATA_DIR, UA, get_boundary, tile_points  # noqa: E402
+from comum import DATA_DIR  # noqa: E402
+from mapillary import MLY_TILES, MLY_URL, UA, categorize_mly, get_boundary, session, tile_points, token  # noqa: E402
 
 OUT_DIR = DATA_DIR / "ground_truth"
 OVERPASS = "https://overpass-api.de/api/interpreter"
-MLY_TILES = {
-    # tileset -> camada dentro da tile
-    "mly_map_feature_point": "point",
-    "mly_map_feature_traffic_sign": "traffic_sign",
+# tipos Mapillary que interessam ao desafio (para a listagem)
+INTERESSA = {
+    "object--street-light": "Iluminação (luminária: poste de luz ou candeeiro)",
+    "object--support--utility-pole": "Iluminação? (poste: pode ter luminária ou ser elétrico)",
+    "object--support--pole": "Suporte (poste de sinal/iluminação, sem tipo)",
+    "object--trash-can": "Resíduos (caixote: contentor, ecoponto ou papeleira, sem tipo)",
 }
-MLY_URL = "https://tiles.mapillary.com/maps/vtp/{tileset}/2/{z}/{x}/{y}?access_token={token}"
+SIGN_PREFIXES = ("regulatory--", "warning--", "information--", "complementary--")
 
 
 # ---------------------------------------------------------------- categorias
@@ -58,24 +63,6 @@ def categorize_osm(tags: dict):
     return None
 
 
-def categorize_mly(value: str):
-    if value == "object--street-light":
-        return "iluminacao", "candeeiro"
-    if value in ("object--support--utility-pole", "object--support--pole"):
-        return "iluminacao", "poste"   # depois: poste_luz (com luminária perto) ou poste_eletrico
-    if value == "object--trash-can":
-        return "residuos", "contentor"
-    if value.startswith(("regulatory--", "warning--", "information--", "complementary--")):
-        if "--stop--" in value:
-            return "sinalizacao", "stop"
-        if "--yield--" in value:
-            return "sinalizacao", "cedencia"
-        if "maximum-speed-limit" in value:
-            return "sinalizacao", "limite_velocidade"
-        return "sinalizacao", value
-    return None
-
-
 # ---------------------------------------------------------------- fontes
 def fetch_osm(poly):
     query = """
@@ -91,7 +78,7 @@ def fetch_osm(poly):
     );
     out center tags;
     """
-    r = requests.post(OVERPASS, data={"data": query}, headers=UA, timeout=240)
+    r = session().post(OVERPASS, data={"data": query}, headers=UA, timeout=240)
     r.raise_for_status()
     feats = []
     for el in r.json()["elements"]:
@@ -109,16 +96,14 @@ def fetch_osm(poly):
     return feats
 
 
-def fetch_mapillary(boundary, poly, token):
-    minx, miny, maxx, maxy = boundary.bounds
-    tiles = list(mercantile.tiles(minx, miny, maxx, maxy, 14))
-    seen, feats = set(), []
-    s = requests.Session()
-    s.headers.update(UA)
+def mly_points(boundary, poly, tok):
+    """Todos os points da Mapillary dentro do município: (tileset, lon, lat, props), sem repetidos."""
+    tiles = list(mercantile.tiles(*boundary.bounds, 14))
+    seen, s = set(), session()
     for tileset, layer in MLY_TILES.items():
-        print(f"  {tileset}: {len(tiles)} tiles")
+        print(f"  {tileset}: {len(tiles)} mosaicos")
         for t in tiles:
-            url = MLY_URL.format(tileset=tileset, z=t.z, x=t.x, y=t.y, token=token)
+            url = MLY_URL.format(tileset=tileset, z=t.z, x=t.x, y=t.y, token=tok)
             for attempt in range(3):
                 r = s.get(url, timeout=30)
                 if r.status_code == 200:
@@ -132,24 +117,51 @@ def fetch_mapillary(boundary, poly, token):
                 fid = p.get("id")
                 if fid in seen or not poly.contains(Point(lon, lat)):
                     continue
-                cat = categorize_mly(p.get("value", ""))
-                if not cat:
-                    continue
                 seen.add(fid)
-                feats.append(feature(lon, lat, {
-                    "source": "mapillary", "mly_id": fid, "value": p.get("value"),
-                    "category": cat[0], "subtype": cat[1],
-                    "first_seen_at": p.get("first_seen_at"),
-                    "last_seen_at": p.get("last_seen_at"),
-                }))
+                yield tileset, lon, lat, p
+
+
+def fetch_mapillary(boundary, poly, tok):
+    feats = []
+    for _, lon, lat, p in mly_points(boundary, poly, tok):
+        cat = categorize_mly(p.get("value", ""))
+        if cat:
+            feats.append(feature(lon, lat, {
+                "source": "mapillary", "mly_id": p.get("id"), "value": p.get("value"),
+                "category": cat[0], "subtype": cat[1],
+                "first_seen_at": p.get("first_seen_at"), "last_seen_at": p.get("last_seen_at"),
+            }))
     return feats
+
+
+def listar_tipos(boundary, poly, tok, label):
+    counts = {ts: Counter() for ts in MLY_TILES}
+    for ts, _, _, p in mly_points(boundary, poly, tok):
+        counts[ts][p.get("value", "?")] += 1
+    lines = [f"# Tipos de points da Mapillary em {label}", "",
+             "Points = objetos posicionados pela Mapillary (só para medir; nunca entram no catálogo).", ""]
+    for ts, c in counts.items():
+        signs = sum(v for k, v in c.items() if k.startswith(SIGN_PREFIXES))
+        others = [(k, v) for k, v in c.most_common() if not k.startswith(SIGN_PREFIXES)]
+        print(f"\n=== {ts}: {sum(c.values())} points, {len(c)} tipos (sinais: {signs})")
+        lines += [f"## {ts} — {sum(c.values())} points ({len(c)} tipos)", "",
+                  f"Sinais de trânsito (regulatory/warning/information/complementary): **{signs}**", "",
+                  "| Tipo Mapillary | Quantos | Interessa? |", "|---|---|---|"]
+        for k, v in others:
+            tag = INTERESSA.get(k, "")
+            print(f"  {v:>6}  {k}  {('<- ' + tag) if tag else ''}")
+            lines.append(f"| {k} | {v} | {tag} |")
+        lines.append("")
+    out = DATA_DIR / "relatorios"
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "pontos_mapillary.md").write_text("\n".join(lines), encoding="utf-8")
+    print(f"\n-> {out / 'pontos_mapillary.md'}")
 
 
 def mark_light_poles(feats, radius=4.0):
     """Poste da Mapillary com uma luminária (street-light) a <= radius m -> "poste_luz"
     (a posição do poste é a BASE, como a que o sistema calcula); sem luminária perto ->
     "poste_eletrico" (não conta). A luminária fica marcada com o poste que a segura."""
-    import math
     kx, ky = 111320 * math.cos(math.radians(40.64)), 110540
     lights = [f for f in feats if f["properties"]["value"] == "object--street-light"]
     grid = {}
@@ -203,21 +215,23 @@ def summary(feats, label):
 
 
 def main():
-    token = os.getenv("MAPILLARY_TOKEN", "").strip()
-    if not token or "COLA_AQUI" in token:
-        sys.exit("Falta o MAPILLARY_TOKEN no ficheiro .env")
-    boundary, label = get_boundary("Aveiro")
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--listar-tipos", action="store_true", help="só lista os tipos de points da Mapillary")
+    ap.add_argument("--municipio", default="Aveiro", help="(com --listar-tipos) outro município")
+    args = ap.parse_args()
+    tok = token()
+    boundary, label = get_boundary(args.municipio if args.listar_tipos else "Aveiro")
     poly = prep(boundary)
     print(f"Limite: {label}")
+    if args.listar_tipos:
+        return listar_tipos(boundary, poly, tok, label)
 
     print("OSM (Overpass)...")
     osm = fetch_osm(poly)
     print(f"  guardado em {save(osm, 'osm_aveiro.geojson')}")
-
     print("Mapillary map features...")
-    mly = mark_light_poles(fetch_mapillary(boundary, poly, token))
+    mly = mark_light_poles(fetch_mapillary(boundary, poly, tok))
     print(f"  guardado em {save(mly, 'mapillary_features_aveiro.geojson')}")
-
     summary(osm, "OpenStreetMap")
     summary(mly, "Mapillary map features")
 

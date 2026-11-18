@@ -37,7 +37,7 @@ from PIL import Image
 from tqdm import tqdm
 
 sys.path.insert(0, os.path.dirname(__file__))
-from estimate_mapillary import DATA_DIR  # noqa: E402
+from comum import DATA_DIR  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 

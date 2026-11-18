@@ -28,13 +28,11 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import yaml
 from PIL import Image
 from tqdm import tqdm
 
 sys.path.insert(0, os.path.dirname(__file__))
-from estimate_mapillary import DATA_DIR  # noqa: E402
-from evaluate import load_jsonl, nms_by_category  # noqa: E402
+from comum import DATA_DIR, limit_vram, load_jsonl, load_taxonomy, nms_by_category  # noqa: E402,F401
 
 ROOT = Path(__file__).resolve().parents[1]
 SIGLIP = "google/siglip-so400m-patch14-384"  # Apache 2.0
@@ -42,16 +40,19 @@ CROP = 384
 Image.MAX_IMAGE_PIXELS = None
 
 
-def load_taxonomy():
-    with open(ROOT / "config" / "taxonomia.yaml", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+def is_vertical(b):
+    return (b[3] - b[1]) > 1.5 * (b[2] - b[0])
 
 
 def suppress_contained(dets, thr=0.7):
-    """Remove caixas da mesma categoria quase contidas noutra com score maior
-    (ex.: poste inteiro + só a parte de cima do mesmo poste)."""
+    """Remove caixas da mesma categoria quase contidas noutra (ex.: poste inteiro + só a
+    luminária do mesmo poste). Normalmente fica a de score maior; na ILUMINAÇÃO ficam
+    primeiro as caixas verticais (o poste completo): a caixa só da luminária tem o fundo
+    no ar, a distância pelo chão falha e o objeto perdia-se (29% dos casos, 18/11)."""
     keep = []
-    for d in sorted(dets, key=lambda d: -d["score"]):
+    order = sorted(dets, key=lambda d: (not (d["category"] == "iluminacao" and is_vertical(d["bbox"])),
+                                        -d["score"]))
+    for d in order:
         a = d["bbox"]
         area_a = (a[2] - a[0]) * (a[3] - a[1])
         dup = False
@@ -82,9 +83,42 @@ def square_crop(im: Image.Image, box, pad=0.15):
     return canvas.resize((CROP, CROP), Image.BICUBIC), c
 
 
+class EmbeddingCache:
+    """Impressões digitais SigLIP já calculadas, por (foto, caixa). Corridas seguintes só
+    calculam os recortes novos (mudar frases ou referências não obriga a ver tudo de novo)."""
+
+    def __init__(self, path):
+        self.path, self.new = path, {}
+        self.keys, self.emb = {}, None
+        if path.exists():
+            z = np.load(path, allow_pickle=False)
+            if str(z["model"]) == SIGLIP:
+                self.emb = z["emb"]
+                self.keys = {k: i for i, k in enumerate(z["keys"].tolist())}
+
+    @staticmethod
+    def key(iid, bbox):
+        return f"{iid}|" + ",".join(str(int(round(v))) for v in bbox)
+
+    def get(self, k):
+        if k in self.new:
+            return self.new[k]
+        i = self.keys.get(k)
+        return None if i is None else self.emb[i]
+
+    def save(self):
+        if not self.new:
+            return
+        keys = list(self.keys) + list(self.new)
+        new = np.stack(list(self.new.values())).astype(np.float16)
+        emb = new if self.emb is None else np.concatenate([self.emb, new])
+        np.savez(self.path, model=np.array(SIGLIP), keys=np.array(keys), emb=emb)
+
+
 class Classifier:
     def __init__(self, tax, device):
         from transformers import AutoModel, AutoProcessor
+        limit_vram()
         self.proc = AutoProcessor.from_pretrained(SIGLIP)
         self.model = AutoModel.from_pretrained(SIGLIP, dtype=torch.float16).to(device).eval()
         self.device = device
@@ -113,12 +147,22 @@ class Classifier:
         return t / t.norm(dim=-1, keepdim=True)
 
     @torch.inference_mode()
-    def __call__(self, crops, cats):
-        # recortes já vêm 384x384: normalização SigLIP (média 0.5, desvio 0.5) na GPU
+    def encode(self, crops):
+        """Recortes 384x384 -> impressões digitais normalizadas (na GPU)."""
+        # normalização SigLIP (média 0.5, desvio 0.5) feita na GPU
         arr = torch.from_numpy(np.stack([np.asarray(c) for c in crops])).to(self.device)
         pv = ((arr.permute(0, 3, 1, 2).float() / 255 - 0.5) / 0.5).half()
         img = self._tensor(self.model.get_image_features(pixel_values=pv)).float()
-        img = img / img.norm(dim=-1, keepdim=True)
+        return img / img.norm(dim=-1, keepdim=True)
+
+    @torch.inference_mode()
+    def __call__(self, crops, cats):
+        return self.classify(self.encode(crops), cats)
+
+    @torch.inference_mode()
+    def classify(self, img, cats):
+        """Impressões digitais (tensor [N, D]) -> [(subtipo ou None, p_subtipo, p_negativo)]."""
+        img = torch.as_tensor(img, device=self.device).float()
         out = []
         for e, cat in zip(img, cats):
             txt, owners = self.tables[cat]
@@ -167,18 +211,36 @@ def main():
     print(f"{len(work)} imagens, {n_dets} deteções (score >= {args.det_threshold}, após NMS)")
 
     clf = Classifier(tax, device)
+    cache = EmbeddingCache(DATA_DIR / "preds" / "siglip_cache.npz")
+    missing = {iid: [d for d in ds if cache.get(cache.key(iid, d["bbox"])) is None]
+               for iid, ds in work.items()}
+    missing = {iid: ds for iid, ds in missing.items() if ds}
+    n_miss = sum(len(v) for v in missing.values())
+    print(f"Já calculados (cache): {n_dets - n_miss} · a calcular: {n_miss} recortes em {len(missing)} fotos")
 
     def crops_for(iid):
         im = Image.open(DATA_DIR / "images" / f"{iid}.jpg").convert("RGB")
-        return iid, [square_crop(im, p["bbox"]) for p in work[iid]]
+        return iid, [square_crop(im, p["bbox"])[0] for p in missing[iid]]
+
+    # 1) impressões digitais só dos recortes novos (é aqui que a GPU trabalha)
+    t0 = time.time()
+    pend, last = [], (list(missing)[-1] if missing else None)
+    with ThreadPoolExecutor(args.threads) as pool:
+        for iid, crops in tqdm(pool.map(crops_for, list(missing)), total=len(missing), unit="img"):
+            pend += [(cache.key(iid, d["bbox"]), c) for d, c in zip(missing[iid], crops)]
+            while len(pend) >= args.batch or (pend and iid == last):
+                chunk, pend = pend[: args.batch], pend[args.batch:]
+                emb = clf.encode([c for _, c in chunk]).half().cpu().numpy()
+                cache.new.update({k: e for (k, _), e in zip(chunk, emb)})
+    cache.save()
 
     out_path = DATA_DIR / "preds" / f"{args.model}_classified.jsonl"
-    stats, t0 = Counter(), time.time()
-    queue = []  # (iid, det, crop_quadrado, crop_original)
+    stats = Counter()
 
     def flush(f, items):
-        res = clf([q[2] for q in items], [q[1]["category"] for q in items])
-        for (iid, det, _, raw), (sub, p_sub, p_neg) in zip(items, res):
+        emb = np.stack([cache.get(cache.key(iid, det["bbox"])) for iid, det in items])
+        res = clf.classify(emb, [det["category"] for _, det in items])
+        for (iid, det), (sub, p_sub, p_neg) in zip(items, res):
             if sub is None:
                 stats["descartadas_negativo"] += 1
                 continue
@@ -204,16 +266,12 @@ def main():
             previous = [ln for ln in f if json.loads(ln)["category"] not in args.categories]
         print(f"Mantidos {len(previous)} registos de outras categorias")
 
-    with out_path.open("w", encoding="utf-8") as f, ThreadPoolExecutor(args.threads) as pool:
+    # 2) classificar todos (frases contra impressões digitais: rápido)
+    items = [(iid, d) for iid, ds in work.items() for d in ds]
+    with out_path.open("w", encoding="utf-8") as f:
         f.writelines(previous)
-        for iid, crops in tqdm(pool.map(crops_for, list(work)), total=len(work), unit="img"):
-            for det, (sq, raw) in zip(work[iid], crops):
-                queue.append((iid, det, sq, raw))
-            while len(queue) >= args.batch:
-                flush(f, queue[: args.batch])
-                queue = queue[args.batch:]
-        if queue:
-            flush(f, queue)
+        for i in range(0, len(items), 1024):
+            flush(f, items[i:i + 1024])
 
     dt = time.time() - t0
     print(f"\nFeito em {dt:.0f}s -> {out_path}")

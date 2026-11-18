@@ -32,9 +32,7 @@ import yaml
 from shapely.geometry import Point
 
 sys.path.insert(0, os.path.dirname(__file__))
-from estimate_mapillary import DATA_DIR  # noqa: E402
-from evaluate import load_jsonl, matches  # noqa: E402
-from evaluate_subtypes import mapillary_to_subtype  # noqa: E402
+from comum import DATA_DIR, load_jsonl, mapillary_to_subtype, matches  # noqa: E402
 from geolocate import MIN_CONTENTOR_M, box_width_m, project, reference_index, xy  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]

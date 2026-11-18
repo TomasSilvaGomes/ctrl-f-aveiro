@@ -1,0 +1,10 @@
+# Fim de linha igual em Windows, WSL e Linux (os .sh têm de ter LF para o bash)
+* text=auto eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.JPG binary
+*.pdf binary
+*.npz binary

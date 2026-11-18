@@ -34,7 +34,7 @@ from pathlib import Path
 import yaml
 
 sys.path.insert(0, os.path.dirname(__file__))
-from estimate_mapillary import DATA_DIR  # noqa: E402
+from comum import DATA_DIR  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 LAT0 = 40.64

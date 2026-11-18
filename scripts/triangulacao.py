@@ -45,7 +45,7 @@ from shapely.geometry import Point
 
 sys.path.insert(0, os.path.dirname(__file__))
 from build_catalog import cluster  # noqa: E402
-from estimate_mapillary import DATA_DIR  # noqa: E402
+from comum import DATA_DIR  # noqa: E402
 from geolocate import reference_index, xy  # noqa: E402
 
 NOMES = {"sinalizacao": "Sinais", "iluminacao": "Iluminação", "residuos": "Contentores"}

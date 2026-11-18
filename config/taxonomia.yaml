@@ -111,7 +111,7 @@ categorias:
     #    ferro forjado) ou em poste curto ornamentado, muitas vezes com 2 lanternas.
     # Postes de eletricidade/telecomunicações: descartar (estão nos negativos).
     # Frases escolhidas por escolhe_prompts.py (fase 1, 30 fotos de referência) e
-    # confirmadas na auditoria visual (audita_classificacao.py, 17/11): iluminação certa
+    # confirmadas na auditoria visual (escolhe_prompts.py auditar, 17/11): iluminação certa
     # 74% vs 48% com "a lamp"/"a utility pole".
     subtipos:
       - id: poste_iluminacao
@@ -150,29 +150,18 @@ categorias:
         mapillary: []
         prompts: ["a black or dark grey wheeled plastic garbage container with a lid",
                   "a large green wheeled garbage container"]
-      # Duas famílias (catálogo de fabricante, ex. Subtainer/APYRA e Tierso/Molok):
-      #  - enterrado: só se vê o "marco de deposição", caixa metálica escura de ~1 m,
-      #    assente numa placa metálica/pedra no passeio;
-      #  - semi-enterrado: cilindro largo e baixo, revestido a ripas de madeira, aço
-      #    ou cinzento, com tampa escura em cúpula e argola de elevação no topo.
+      
       - id: subterraneo
         label: Contentor subterrâneo
         codigo: location=underground
         mapillary: []
-        # Regra de tamanho (geolocate.py, onde a distância é conhecida): semi-enterrados
-        # têm 1,45–1,95 m de diâmetro; papeleiras ~0,5 m. Mais estreito que 1,2 m ->
-        # descartado (quase sempre papeleira). Atenção: marcos de enterrados (~0,5–0,7 m)
-        # também são descartados.
         largura_min_m: 1.2
         senao: descartar
-        # NÃO usar "caixa metálica escura de topo arredondado" sozinha: testado a 17/11,
-        # apanha as papeleiras (só 4 em 40 eram subterrâneos).
         prompts: ["a row of dark metal underground waste container inlets with yellow, blue or green openings on a metal platform",
                   "grey cylindrical waste deposit columns with dark lids, the inlets of underground containers",
                   "a large round semi-underground waste container with wooden slat cladding and a black dome lid with a lifting ring",
                   "a large round grey semi-underground waste container with a dark dome lid"]
 
-# Catálogo: ecopontos próximos (vários "iglus" lado a lado) formam UMA ilha.
 agrupamentos:
   ilha_reciclagem:
     label: Ilha de reciclagem (ecoponto)
@@ -182,8 +171,7 @@ agrupamentos:
     raio_m: 8          # contentores a <= 8 m entre si formam uma ilha
     min_membros: 1
 
-# Descrições "não é mobiliário": se uma destas ganhar, a deteção é descartada
-# (reduz falsos positivos do detetor zero-shot).
+
 negativos:
   - "a tree trunk"
   - "a building facade"
@@ -208,6 +196,8 @@ negativos:
   - "a concrete block"
   - "a small litter bin attached to a pole on the sidewalk"   # papeleiras: não pedidas
   - "a small public trash can on a post"
-  - "a wooden or concrete utility pole with electric wires and no lamp"   # mentores: ignorar
-  # NÃO usar "a bare metal pole without any lamp": testado a 17/11, descartava postes de
-  # iluminação verdadeiros (luminária pequena no recorte) — a deteção caiu de 53% para 38%.
+  - "a wooden or concrete utility pole with electric wires and no lamp"
+  - "Traffic Light"
+  - "a traffic light"
+  - "a set of road traffic signal lights"
+  - "an intersection traffic signal"

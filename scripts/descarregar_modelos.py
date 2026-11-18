@@ -31,7 +31,7 @@ import torch
 from PIL import Image, ImageOps
 
 sys.path.insert(0, os.path.dirname(__file__))
-from estimate_mapillary import DATA_DIR  # noqa: E402
+from comum import DATA_DIR  # noqa: E402
 
 Image.MAX_IMAGE_PIXELS = None
 MODELOS = {

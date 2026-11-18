@@ -7,6 +7,7 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 
+# Documentos locais (PDFs do desafio/DGV e páginas de apoio): não se publicam
 /docs
 /pdfs
 
@@ -15,6 +16,9 @@ data/images/
 data/*/images/
 data/viz/
 data/*/viz/
-data/**/*.antes*.jsonl
+data/**/siglip_cache.npz
+data/**/*.antes*
 data/piloto_*/ground_truth/*.geojson
 *.zip
+# candidatas da web ainda NÃO revistas (as boas passam para data/referencias/classes)
+data/referencias/recolha_web/

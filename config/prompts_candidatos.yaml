@@ -1,6 +1,6 @@
 # Frases CANDIDATAS (inglês) para scripts/escolhe_prompts.py. Cada frase pertence a
 # UMA classe nossa (categoria / subtipo). Origem: dicionário dos modelos
-# (testa_vocabulario.py) + descrições ao estilo CuPL (várias descrições por classe).
+# (escolhe_prompts.py vocabulario) + descrições ao estilo CuPL (várias descrições por classe).
 
 # Detetor (OWLv2): encontra a CATEGORIA. Frases curtas (<= 16 tokens).
 detetor:

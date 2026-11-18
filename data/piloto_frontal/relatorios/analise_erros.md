@@ -8,8 +8,8 @@ As referências (Mapillary e OpenStreetMap) servem só para medir. Também têm 
 
 | Categoria | Objetos nas fotos | Encontrados | Taxa |
 |---|---|---|---|
-| Sinais | 93 | 84 | 90% |
-| Iluminação | 14 | 6 | 43% |
+| Sinais | 93 | 88 | 95% |
+| Iluminação | 14 | 12 | 86% |
 | Contentores | 0 | 0 | — |
 
 *Objetos nas fotos = marcados pela Mapillary (com pelo menos 24 píxeis). Contentores: só os com >= 0.9 m de largura (a Mapillary marca também papeleiras, que a ficha não pede).*
@@ -19,17 +19,17 @@ As referências (Mapillary e OpenStreetMap) servem só para medir. Também têm 
 
 | Tipo de sinal | Sinais | Acerto |
 |---|---|---|
-| Estacionamento | 22 | 100% |
+| Estacionamento | 27 | 100% |
 | Obrigação | 14 | 64% |
 | Passagem para peões | 12 | 100% |
-| Trânsito de sentido único | 10 | 100% |
+| Trânsito de sentido único | 10 | 90% |
 | Paragem e estacionamento proibidos | 10 | 100% |
-| Cedência de passagem | 6 | 100% |
-| Outros | 3 | 0% |
+| Cedência de passagem | 7 | 100% |
 | Direção / indicação | 3 | 100% |
 | Sentido proibido | 2 | 100% |
 | Perigo | 2 | 50% |
-| **Total** | **84** | **89%** |
+| Outros | 1 | 0% |
+| **Total** | **88** | **91%** |
 
 *Sinais = sinais encontrados pelo sistema que a Mapillary também identificou. Acerto = o sistema deu o mesmo tipo.*
 
@@ -37,11 +37,11 @@ Trocas mais frequentes:
 
 | Era | O sistema disse | Vezes |
 |---|---|---|
-| Obrigação | Outros | 4 |
-| Outros | Estacionamento proibido | 2 |
-| Outros | Direção / indicação | 1 |
+| Obrigação | Outros | 3 |
+| Obrigação | Trânsito de sentido único | 2 |
+| Outros | Estacionamento proibido | 1 |
+| Trânsito de sentido único | Obrigação | 1 |
 | Perigo | Outros | 1 |
-| Obrigação | Trânsito de sentido único | 1 |
 
 
 ## 3. Lê o número do limite de velocidade?
@@ -94,9 +94,9 @@ Números de referência nesta amostra: . A maioria das ruas da cidade é de 30 k
 
 | Categoria | Objetos medidos | Acertam até 5 m | Acertam até 10 m | Erro típico |
 |---|---|---|---|---|
-| Sinais | 117 | 59% | 88% | 4,2 m |
-| Iluminação | 228 | 27% | 80% | 7,1 m |
-| Contentores | 12 | 25% | 75% | 8,9 m |
+| Sinais | 118 | 58% | 88% | 4,2 m |
+| Iluminação | 287 | 26% | 76% | 7,5 m |
+| Contentores | 10 | 20% | 80% | 8,4 m |
 
 *Acertam até 5 m = % de objetos a 5 metros ou menos do sítio certo (os restantes falham). Erro típico = metade dos objetos erra menos do que isto.*
 
@@ -104,9 +104,9 @@ Números de referência nesta amostra: . A maioria das ruas da cidade é de 30 k
 
 | Margem aceite | Sinais | Iluminação | Contentores |
 |---|---|---|---|
-| até 2 m | 21% | 5% | 17% |
-| até 5 m | 59% | 27% | 25% |
-| até 10 m | 88% | 80% | 75% |
+| até 2 m | 21% | 5% | 10% |
+| até 5 m | 58% | 26% | 20% |
+| até 10 m | 88% | 76% | 80% |
 | até 20 m | 100% | 100% | 100% |
 
 *Cada valor = % de objetos que ficam dentro dessa margem. A taxa de falha é o resto até 100%.*
@@ -115,9 +115,9 @@ Números de referência nesta amostra: . A maioria das ruas da cidade é de 30 k
 
 | Categoria | Objeto perto (até 10 m) | Objeto longe (mais de 10 m) |
 |---|---|---|
-| Sinais | 85% | 56% |
-| Iluminação | 43% | 27% |
-| Contentores | 25% | 25% |
+| Sinais | 85% | 55% |
+| Iluminação | 62% | 25% |
+| Contentores | 0% | 25% |
 
 *Valores = % que acertam até 5 m. Objetos perto da câmara ficam mais bem posicionados.*
 
@@ -125,9 +125,9 @@ Números de referência nesta amostra: . A maioria das ruas da cidade é de 30 k
 
 | Categoria | Foto 360° | Foto frontal |
 |---|---|---|
-| Sinais | — | 59% |
-| Iluminação | — | 27% |
-| Contentores | — | 25% |
+| Sinais | — | 58% |
+| Iluminação | — | 26% |
+| Contentores | — | 20% |
 
 *Valores = % que acertam até 5 m. As fotos 360° (recentes) posicionam melhor.*
 
@@ -135,9 +135,9 @@ Números de referência nesta amostra: . A maioria das ruas da cidade é de 30 k
 
 | Categoria | Erro típico do sistema | Erro típico ao acaso | Melhor que o acaso? |
 |---|---|---|---|
-| Sinais | 4,2 m | 10,0 m | sim |
-| Iluminação | 7,1 m | 9,1 m | não |
-| Contentores | 8,9 m | 10,9 m | não |
+| Sinais | 4,2 m | 9,4 m | sim |
+| Iluminação | 7,5 m | 9,4 m | não |
+| Contentores | 8,4 m | 10,0 m | não |
 
 *Ao acaso = o mesmo objeto à mesma distância da câmara, mas numa direção sorteada. Se o sistema não for bem melhor do que isto, o número é sorte.*
 
@@ -145,9 +145,9 @@ Números de referência nesta amostra: . A maioria das ruas da cidade é de 30 k
 
 | Categoria | Erro na distância à câmara | Erro na direção |
 |---|---|---|
-| Sinais | 2,9 m | 1,7 m |
-| Iluminação | 5,3 m | 2,7 m |
-| Contentores | 5,8 m | 1,5 m |
+| Sinais | 2,8 m | 1,7 m |
+| Iluminação | 5,7 m | 2,8 m |
+| Contentores | 6,6 m | 1,5 m |
 
 *Valores típicos. A direção está bem medida; o que falha é a distância. A triangulação (usar várias fotos) corrige isto.*
 
@@ -156,8 +156,8 @@ Números de referência nesta amostra: . A maioria das ruas da cidade é de 30 k
 
 | Categoria | Objetos repetidos | Registos por objeto |
 |---|---|---|
-| Sinais | 20% | 1,2 |
-| Iluminação | 34% | 1,4 |
-| Contentores | 100% | 2,0 |
+| Sinais | 30% | 1,4 |
+| Iluminação | 35% | 1,5 |
+| Contentores | 0% | 1,0 |
 
 *Objetos repetidos = % de objetos reais com mais de um registo no catálogo. Registos por objeto: o ideal é 1,0.*

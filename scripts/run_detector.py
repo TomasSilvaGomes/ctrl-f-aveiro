@@ -2,7 +2,9 @@
 Corre um detetor zero-shot sobre a amostra e grava as deteções em
 data/preds/<modelo>.jsonl  (image_id, prompt, category, subtype, score, bbox).
 
-- Imagens normais: letterbox para quadrado 960x960.
+- Imagens normais (frontais): a foto inteira em quadrado 960x960 + metade esquerda e
+  direita (60% da largura, sobreposição de 20%), para apanhar sinais pequenos ao fundo
+  (tiling; desligar com --sem-tiling).
 - Panorâmicas 360°: 6 vistas perspetiva de 90° (yaw = 30°, 90°, ..., 330°),
   deteção em cada vista e conversão das caixas para coordenadas da panorâmica.
 - Pré-processamento feito por nós (o pré-processador do OWLv2 é muito lento).
@@ -30,16 +32,12 @@ from PIL import Image
 from tqdm import tqdm
 
 sys.path.insert(0, os.path.dirname(__file__))
-from estimate_mapillary import DATA_DIR  # noqa: E402
+from comum import DATA_DIR, limit_vram, load_taxonomy  # noqa: E402
 from panorama import perspective_view, view_box_to_pano  # noqa: E402
 
 def load_prompts():
     """Frases do detetor (config/taxonomia.yaml, secção 'detetor'): frase -> (categoria, '')."""
-    import yaml
-    from pathlib import Path
-    with open(Path(__file__).resolve().parents[1] / "config" / "taxonomia.yaml", encoding="utf-8") as f:
-        det = yaml.safe_load(f)["detetor"]
-    return {p: (cat, "") for cat, ps in det.items() for p in ps}
+    return {p: (cat, "") for cat, ps in load_taxonomy()["detetor"].items() for p in ps}
 
 
 # prompt de texto -> (categoria, subtipo provisório; o subtipo é decidido pelo SigLIP)
@@ -52,8 +50,23 @@ MEAN = torch.tensor([0.48145466, 0.4578275, 0.40821073]).view(1, 3, 1, 1)
 STD = torch.tensor([0.26862954, 0.26130258, 0.27577711]).view(1, 3, 1, 1)
 
 
-def prepare(row):
-    """Lê a imagem e devolve uma lista de vistas 960x960 + info para desfazer."""
+TILE_W, TILE_OVERLAP = 0.6, 0.2   # frontais: metades com 60% da largura (20% de sobreposição)
+
+
+def letterbox(im, x0=0):
+    """Imagem (array) -> quadrado 960x960 (cinzento à volta) + info para desfazer."""
+    H, W = im.shape[:2]
+    s = SIZE / max(W, H)
+    small = np.asarray(Image.fromarray(im).resize((round(W * s), round(H * s)), Image.BILINEAR))
+    canvas = np.full((SIZE, SIZE, 3), 127, dtype=np.uint8)
+    canvas[: small.shape[0], : small.shape[1]] = small
+    return canvas, s, x0
+
+
+def prepare(row, tiling=True):
+    """Lê a imagem e devolve uma lista de vistas 960x960 + info para desfazer.
+    360°: 6 vistas de 90°. Frontal: a foto inteira + (tiling) metade esquerda e direita
+    com sobreposição, para os sinais pequenos ao fundo terem mais resolução."""
     im = np.asarray(Image.open(DATA_DIR / "images" / row["file"]).convert("RGB"))
     H, W = im.shape[:2]
     views = []
@@ -61,19 +74,22 @@ def prepare(row):
         for yaw in YAWS:
             views.append((perspective_view(im, yaw, FOV, SIZE), {"pano": True, "W": W, "H": H, "yaw": yaw}))
     else:
-        s = SIZE / max(W, H)
-        small = np.asarray(Image.fromarray(im).resize((round(W * s), round(H * s)), Image.BILINEAR))
-        canvas = np.full((SIZE, SIZE, 3), 127, dtype=np.uint8)
-        canvas[: small.shape[0], : small.shape[1]] = small
-        views.append((canvas, {"pano": False, "W": W, "H": H, "scale": s}))
+        parts = [(0, W)]
+        if tiling:
+            tw = int(W * TILE_W)
+            parts += [(0, tw), (W - tw, W)]
+        for a, b in parts:
+            canvas, s, ox = letterbox(im[:, a:b], a)
+            views.append((canvas, {"pano": False, "W": W, "H": H, "scale": s, "ox": ox}))
     return row, views
 
 
 def to_original(box, info):
     if info["pano"]:
         return view_box_to_pano(box, info["W"], info["H"], info["yaw"], FOV, SIZE)
-    s = info["scale"]
+    s, ox = info["scale"], info.get("ox", 0)
     x0, y0, x1, y1 = (b / s for b in box)
+    x0, x1 = x0 + ox, x1 + ox
     x0, y0, x1, y1 = max(0, x0), max(0, y0), min(info["W"], x1), min(info["H"], y1)
     if x1 <= x0 or y1 <= y0:
         return None
@@ -84,6 +100,7 @@ class Owlv2:
     def __init__(self, device):
         from transformers import Owlv2ForObjectDetection, Owlv2Processor
         name = MODELS["owlv2"]
+        limit_vram()  # máx. 95% da VRAM (evita o Windows usar a RAM normal)
         self.proc = Owlv2Processor.from_pretrained(name)
         self.model = Owlv2ForObjectDetection.from_pretrained(name, dtype=torch.float16).to(device).eval()
         self.device = device
@@ -113,6 +130,9 @@ def main():
     ap.add_argument("--threads", type=int, default=os.cpu_count() or 8,
                     help="threads a abrir/recortar fotos (o limite costuma ser a GPU)")
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--sem-tiling", action="store_true", help="frontais: só a foto inteira (como antes)")
+    ap.add_argument("--apenas-frontais", action="store_true",
+                    help="refaz só as fotos frontais e mantém as deteções das 360° do ficheiro anterior")
     args = ap.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -121,9 +141,17 @@ def main():
         rows = list(csv.DictReader(f))
     if args.limit:
         rows = rows[: args.limit]
+    out_path = DATA_DIR / "preds" / f"{args.model}.jsonl"
+    keep_lines = []
+    if args.apenas_frontais:
+        pano_ids = {r["id"] for r in rows if r["is_pano"] == "True"}
+        if out_path.exists():
+            with out_path.open(encoding="utf-8") as f:
+                keep_lines = [ln for ln in f if json.loads(ln)["image_id"] in pano_ids]
+        rows = [r for r in rows if r["is_pano"] != "True"]
+        print(f"Só frontais: {len(rows)} fotos (mantidas {len(keep_lines)} deteções das 360°)")
 
     det = Owlv2(device)
-    out_path = DATA_DIR / "preds" / f"{args.model}.jsonl"
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     t0, n_det, n_views, dropped = time.time(), 0, 0, 0
@@ -143,8 +171,11 @@ def main():
                                     "subtype": sub, "score": round(score, 4), "bbox": ob}) + "\n")
                 n_det += 1
 
+    from functools import partial
     with out_path.open("w", encoding="utf-8") as f, ThreadPoolExecutor(args.threads) as pool:
-        for row, views in tqdm(pool.map(prepare, rows), total=len(rows), unit="img"):
+        f.writelines(keep_lines)
+        prep = partial(prepare, tiling=not args.sem_tiling)
+        for row, views in tqdm(pool.map(prep, rows), total=len(rows), unit="img"):
             for arr, info in views:
                 pending.append((row, info, arr))
                 n_views += 1

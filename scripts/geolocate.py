@@ -5,6 +5,8 @@
   distância = plano do chão (candeeiros, contentores: a base da caixa toca no chão)
               ou tamanho conhecido (sinais: ~0,65 m de largura)
   posição   = posição da câmara projetada (rumo, distância)
+  fotos normais: direções corrigidas da distorção da lente (camera_parameters da
+              Mapillary); caixas encostadas às bordas laterais (--borda) são ignoradas
   largura   = distância x largura angular da caixa (metros). Se a taxonomia tiver
               "largura_min_m" num subtipo e o objeto for mais estreito, passa para o
               subtipo "senao", ou é descartado se senao = "descartar"
@@ -36,7 +38,7 @@ from shapely.geometry import Point
 from shapely.strtree import STRtree
 
 sys.path.insert(0, os.path.dirname(__file__))
-from estimate_mapillary import DATA_DIR  # noqa: E402
+from comum import DATA_DIR  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -73,26 +75,60 @@ def geometry(det, meta, h_pano, h_persp):
             return bearing % 360, None, "chao"
         return bearing % 360, h_pano / math.tan(below), "chao"
 
-    params = json.loads(meta["camera_parameters"] or "null") or [0.8]
-    f = float(params[0]) * max(W, H)
-    bearing = heading + math.degrees(math.atan((xc - W / 2) / f))
+    xu, _ = undistort(xc, y1, meta)
+    bearing = heading + math.degrees(math.atan(xu))
     if is_sign:
-        ang = math.atan((x1 - W / 2) / f) - math.atan((x0 - W / 2) / f)
+        ang = angular_width(det, meta)
         return bearing % 360, SIGN_WIDTH_M / ang if ang > 0 else None, "tamanho"
-    below = math.atan((y1 - H / 2) / f)
+    xb, yb = undistort(xc, y1, meta)
+    below = math.atan2(yb, math.sqrt(1 + xb * xb))   # ângulo da base abaixo do horizonte
     if below < math.radians(0.5):
         return bearing % 360, None, "chao"
     return bearing % 360, h_persp / math.tan(below), "chao"
 
 
+def undistort(px, py, meta):
+    """Píxel de uma foto normal -> direção sem distorção da lente (x/z, y/z), com o modelo
+    de câmara da Mapillary/OpenSfM: camera_parameters = [focal, k1, k2] (focal relativa ao
+    lado maior). 'perspective': r_d = r_u (1 + k1 r_u² + k2 r_u⁴); 'fisheye':
+    r_d = θ (1 + k1 θ² + k2 θ⁴), com θ = atan(r_u)."""
+    W, H = float(meta["thumb_w"]), float(meta["thumb_h"])
+    p = json.loads(meta.get("camera_parameters") or "null") or [0.8]
+    focal = float(p[0]) or 0.8
+    k1, k2 = (float(p[1]), float(p[2])) if len(p) >= 3 else (0.0, 0.0)
+    xd = (px - W / 2) / max(W, H) / focal
+    yd = (py - H / 2) / max(W, H) / focal
+    rd = math.hypot(xd, yd)
+    if rd < 1e-9 or (k1 == 0 and k2 == 0 and meta.get("camera_type") != "fisheye"):
+        return xd, yd
+    if meta.get("camera_type") == "fisheye":
+        th = rd
+        for _ in range(20):
+            th = rd / (1 + k1 * th ** 2 + k2 * th ** 4)
+        ru = math.tan(min(th, 1.5))
+    else:
+        ru = rd
+        for _ in range(20):
+            ru = rd / (1 + k1 * ru ** 2 + k2 * ru ** 4)
+    return xd * ru / rd, yd * ru / rd
+
+
+def at_border(det, meta, frac):
+    """Caixa encostada às bordas laterais de uma foto normal (onde a lente mais distorce)."""
+    if meta["is_pano"] == "True" or frac <= 0:
+        return False
+    W = float(meta["thumb_w"])
+    return det["bbox"][0] < frac * W or det["bbox"][2] > (1 - frac) * W
+
+
 def angular_width(det, meta):
     """Largura angular da caixa (radianos)."""
-    x0, _, x1, _ = det["bbox"]
-    W, H = float(meta["thumb_w"]), float(meta["thumb_h"])
+    x0, y0, x1, y1 = det["bbox"]
+    W = float(meta["thumb_w"])
     if meta["is_pano"] == "True":
         return (x1 - x0) / W * 2 * math.pi
-    f = float((json.loads(meta["camera_parameters"] or "null") or [0.8])[0]) * max(W, H)
-    return math.atan((x1 - W / 2) / f) - math.atan((x0 - W / 2) / f)
+    yc = (y0 + y1) / 2
+    return math.atan(undistort(x1, yc, meta)[0]) - math.atan(undistort(x0, yc, meta)[0])
 
 
 def box_width_m(bbox, meta, h_pano=2.2, h_persp=1.66):
@@ -145,6 +181,8 @@ def main():
     ap.add_argument("--h-persp", type=float, default=1.95,
                     help="altura da câmara normal/frontal (m) — 1.95 sugerido pela calibração (17/11)")
     ap.add_argument("--max-dist", type=float, default=35)
+    ap.add_argument("--borda", type=float, default=0.03,
+                    help="fotos normais: ignora caixas a menos desta fração das bordas laterais (0 = não)")
     ap.add_argument("--match-m", type=float, default=20)
     args = ap.parse_args()
 
@@ -153,6 +191,7 @@ def main():
     trees = reference_index()
     rules = size_rules()
     n_resized = defaultdict(int)
+    n_border = 0
 
     out_path = DATA_DIR / "preds" / f"{args.model}_geo.jsonl"
     n_in = n_out = 0
@@ -168,6 +207,9 @@ def main():
             n_in += 1
             meta = imgs.get(det["image_id"])
             if not meta or not meta["lon"]:
+                continue
+            if at_border(det, meta, args.borda):
+                n_border += 1
                 continue
             g = geometry(det, meta, args.h_pano, args.h_persp)
             if not g or g[1] is None or not (1 <= g[1] <= args.max_dist):
@@ -212,6 +254,7 @@ def main():
                 ratios["360" if det["pano"] else "normal"].append(true_d / dist)
 
     print(f"Deteções classificadas: {n_in:,}  |  com coordenadas (1–{args.max_dist:.0f} m): {n_out:,}")
+    print(f"Ignoradas por estarem encostadas às bordas (fotos normais, {args.borda:.0%}): {n_border}")
     for k, n in n_resized.items():
         print(f"Regra de tamanho: {k}: {n}")
     print(f"-> {out_path}\n")
