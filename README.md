@@ -73,7 +73,26 @@ depois a pipeline + `scripts\triangulacao.py` (posição com várias fotos).
 | `testa_semelhanca.py`, `testa_vocabulario.py` | Testes (código exato dos sinais; vocabulário dos modelos) |
 | `lista_pontos_mapillary.py` | Que "points" a Mapillary tem num município |
 
-## 5. Regras (ficha do desafio)
+## 5. Aplicação web (protótipo)
+
+Instala as dependências do projeto e inicia o catálogo interativo:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install "streamlit>=1.49" "folium>=0.15" "streamlit-folium>=0.25"
+$env:CTRL_F_ADMIN_PASSWORD = "escolhe-uma-palavra-passe"
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+O catálogo pode ser consultado sem autenticação. A área de administração só fica
+disponível quando `CTRL_F_ADMIN_PASSWORD` está configurada; permite rever deteções,
+corrigir o tipo, a designação e as coordenadas, e confirmar ou rejeitar elementos.
+As correções atualizam `data/catalogo/catalogo.geojson` e `catalogo.csv`.
+Os visitantes podem filtrar e exportar o catálogo visível em GeoJSON ou CSV.
+Este acesso simples destina-se ao protótipo local, não a uma publicação em produção.
+Para outra cidade, define também `CTRL_F_MUNICIPALITY` e `CTRL_F_CATALOG_PATH`
+(caminho para o respetivo ficheiro GeoJSON); as correções serão gravadas junto desse ficheiro.
+
+## 6. Regras (ficha do desafio)
 
 - Fotos Mapillary: **CC BY-SA 4.0** — mostrar sempre autor + link (o catálogo guarda-os).
 - **Rostos e matrículas** nunca guardados nem mostrados (desfocar antes de mostrar recortes).

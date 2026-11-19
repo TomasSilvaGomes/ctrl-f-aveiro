@@ -1,5 +1,5 @@
 {
-  "imagem": "C:\\Users\\Utilizador\\Desktop\\2.png",
+  "imagem": "C:\\Users\\tiago\\Desktop\\image.png",
   "modelo": "yolov8m-world.pt",
   "classes": [
     "Iluminação pública",
@@ -41,7 +41,7 @@
       "categoria": "Iluminação pública",
       "subtipo": "poste_iluminacao",
       "rotulo": "Poste de luz",
-      "confianca_subtipo": 0.7658,
+      "confianca_subtipo": 0.7654,
       "prompt_tecnico": "a tall street light pole with an arm and lamp head"
     },
     {
@@ -55,7 +55,7 @@
       "categoria": "Resíduos",
       "subtipo": "indiferenciado",
       "rotulo": "Contentor indiferenciado",
-      "confianca_subtipo": 0.9825,
+      "confianca_subtipo": 0.9824,
       "prompt_tecnico": "a trash bin"
     },
     {

@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_IMAGE = Path(r"C:\Users\Utilizador\Desktop\2.png")
+DEFAULT_IMAGE = Path(r"C:\Users\tiago\Desktop\image.png")
 TAXONOMIA_PATH = ROOT / "config" / "taxonomia.yaml"
 
 
