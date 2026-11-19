@@ -19,6 +19,8 @@ from threading import Lock
 
 from PIL import Image, ImageChops, ImageFilter
 
+from mapillary_photos import MapillaryPhotoError, fetch_photo, image_key
+
 ROOT = Path(__file__).resolve().parent
 SAM2_MODEL = "facebook/sam2.1-hiera-tiny"
 LOGGER = logging.getLogger(__name__)
@@ -34,7 +36,7 @@ class PhotoPreview:
 
 @dataclass(frozen=True)
 class PreviewResult:
-    preview: PhotoPreview
+    preview: PhotoPreview | None
     notice: str | None = None
 
 
@@ -144,6 +146,36 @@ def _data_directory(catalog_path):
     return Path(os.environ.get("DATA_DIR") or catalog_path.parent.parent).resolve()
 
 
+@lru_cache(maxsize=4)
+def _sample_sizes(directory):
+    path = directory / "meta" / "sample_images.csv"
+    if not path.is_file():
+        return {}
+    sizes = {}
+    with path.open(encoding="utf-8-sig") as file:
+        for row in csv.DictReader(file):
+            try:
+                width, height = int(row["thumb_w"]), int(row["thumb_h"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if width > 0 and height > 0:
+                sizes[row["id"]] = (width, height)
+    return sizes
+
+
+def _aligned_box(catalog_path, props, size, *, remote=False):
+    box = props.get("imagem_bbox")
+    if not box or len(box) != 4:
+        return None
+    original = _sample_sizes(_data_directory(catalog_path)).get(str(props.get("imagem_id")))
+    if original is None:
+        return None if remote else box
+    width, height = size
+    if not math.isclose(original[0] / original[1], width / height, rel_tol=0.025):
+        return None
+    return tuple(value * dimension for value, dimension in zip(normalised_box(box, original), size * 2))
+
+
 def _local_image(catalog_path, props):
     image_id = str(props.get("imagem_id") or "")
     if not image_id.isdecimal():
@@ -167,6 +199,8 @@ def local_preview_image(catalog_path, props):
         return None, None
     with Image.open(path) as file:
         image = file.convert("RGB")
+    if not reference:
+        box = _aligned_box(catalog_path, props, image.size)
     return _frame_image(image, box, reference)
 
 
@@ -199,9 +233,9 @@ def _frame_image(image, box, reference=False):
     return image, None
 
 
-def load_catalog_preview(catalog_path, props):
+def load_catalog_preview(catalog_path, props, *, prepared_only=False):
     prepared = _read_prepared(preview_path(catalog_path, props))
-    if prepared:
+    if prepared or prepared_only:
         return prepared
     image, box = local_preview_image(catalog_path, props)
     if image is not None:
@@ -225,7 +259,7 @@ def _read_prepared(path, *, load_mask=True):
     return PhotoPreview(path.read_bytes(), mask.read_bytes() if load_mask and mask.is_file() else None, tuple(box) if box else None)
 
 
-def _write_atomic(path, data):
+def write_atomic(path, data):
     with tempfile.NamedTemporaryFile(dir=path.parent, prefix=f".{path.name}.", delete=False) as file:
         temporary = Path(file.name)
         try:
@@ -239,14 +273,27 @@ def _write_atomic(path, data):
 def store_preview(catalog_path, props, preview):
     path = preview_path(catalog_path, props)
     path.parent.mkdir(parents=True, exist_ok=True)
-    _write_atomic(path.with_suffix(".json"), json.dumps({"box": preview.box}).encode("utf-8"))
+    write_atomic(path.with_suffix(".json"), json.dumps({"box": preview.box}).encode("utf-8"))
     if preview.mask:
-        _write_atomic(path.with_suffix(".png"), preview.mask)
-    _write_atomic(path, preview.image)
+        write_atomic(path.with_suffix(".png"), preview.mask)
+    write_atomic(path, preview.image)
 
 
-def _prepare_selected_preview(catalog_path, props, preview):
+def _prepare_selected_preview(catalog_path, props, preview, token):
     try:
+        if preview is None:
+            photo = fetch_photo(image_key(props.get("imagem_id")), token)
+            with Image.open(io.BytesIO(photo.data), formats=("JPEG", "PNG", "WEBP")) as source:
+                if source.width * source.height > 16_000_000:
+                    raise MapillaryPhotoError("A fotografia devolvida pela API é demasiado grande.")
+                box = _aligned_box(catalog_path, props, source.size, remote=True)
+                image, box = _frame_image(source.convert("RGB"), box)
+            relative = normalised_box(box, image.size) if box else None
+            preview = PhotoPreview(jpeg_bytes(image), box=relative)
+            if relative is None:
+                store_preview(catalog_path, props, preview)
+                return PreviewResult(preview)
+
         with Image.open(io.BytesIO(preview.image)) as image:
             box = [value * size for value, size in zip(preview.box, image.size * 2)]
             (mask,) = prepare_masks(image.convert("RGB"), [box])
@@ -254,6 +301,8 @@ def _prepare_selected_preview(catalog_path, props, preview):
             return PreviewResult(preview, "O SAM 2 não encontrou uma máscara para esta caixa de deteção.")
         preview = PhotoPreview(preview.image, mask, preview.box)
         store_preview(catalog_path, props, preview)
+    except MapillaryPhotoError as error:
+        return PreviewResult(preview, str(error))
     except SegmentationError as error:
         LOGGER.exception("Não foi possível calcular a máscara")
         return PreviewResult(preview, str(error))
@@ -267,22 +316,23 @@ class PreviewQueue:
     """Partilha a preparação de uma fotografia entre cliques e sessões."""
 
     def __init__(self):
-        self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="fotografias")
+        self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="fotografias")
         self.jobs = OrderedDict()
         self.lock = Lock()
 
-    def submit(self, catalog_path, props, preview, *, retry=False):
+    def submit(self, catalog_path, props, preview, *, token="", retry=False):
         key = preview_path(catalog_path, props)
         with self.lock:
             job = self.jobs.get(key)
-            if job and (not retry or not job.done()):
-                self.jobs.move_to_end(key)
-                return job
+            if job:
+                if not job.done() or (not retry and (preview is None or job.result().preview is not None)):
+                    self.jobs.move_to_end(key)
+                    return job
             if len(self.jobs) >= 32 and key not in self.jobs:
                 finished = next((candidate for candidate, pending in self.jobs.items() if pending.done()), None)
                 if finished is None:
                     return None
                 self.jobs.pop(finished)
-            job = self.executor.submit(_prepare_selected_preview, catalog_path, props, preview)
+            job = self.executor.submit(_prepare_selected_preview, catalog_path, props, preview, token)
             self.jobs[key] = job
             return job

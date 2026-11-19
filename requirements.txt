@@ -7,6 +7,7 @@ mapbox-vector-tile>=2.0
 shapely>=2.0
 numpy>=1.26
 opencv-python>=4.9
+onnxruntime>=1.19.2,<2
 pillow>=10.0
 pillow-heif>=0.21    # fotos HEIC/HEIF de telemóveis
 pyyaml>=6.0

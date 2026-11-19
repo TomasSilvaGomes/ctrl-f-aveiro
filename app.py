@@ -16,7 +16,6 @@ from collections import Counter
 from hashlib import sha256
 from pathlib import Path
 from threading import Lock
-from urllib.parse import quote
 
 import streamlit as st
 import yaml
@@ -31,6 +30,7 @@ from contributions import (
     MAX_UPLOAD_MB, PHOTO_CATEGORY, SOURCE, UPLOAD_TYPES, ContributionStore,
     PrivacyModelsMissing, decode_photo, photo_coordinates,
 )
+from mapillary_photos import PHOTO_LICENSE, MapillaryPhotoError, fetch_photo, image_key, mapillary_token, photo_link
 from photo_preview import (
     SAM2_MODEL, PhotoPreview, PreviewQueue, SegmentationError, catalog_photo_views, has_catalog_preview,
     load_catalog_preview,
@@ -161,6 +161,7 @@ def save_correction(feature: dict) -> bool:
 
 @st.cache_resource
 def get_analyzer():
+    """Reutiliza a pipeline de análise e os modelos de anonimização entre envios."""
     from photo_analysis import PhotoAnalyzer
 
     return PhotoAnalyzer()
@@ -171,12 +172,73 @@ def close_upload():
     st.session_state.pop("upload_errors", None)
 
 
+def finish_publication(published, results, revision):
+    errors = [message for level, message in results if level == "error"]
+    st.session_state["upload_errors"] = errors
+    st.session_state["upload_messages"] = [(level, message) for level, message in results if level != "error"]
+    st.session_state["upload_open"] = bool(errors)
+    if not errors:
+        st.session_state["upload_revision"] = revision + 1
+    if published:
+        st.session_state["new_contribution"] = published[0]
+    st.rerun()
+
+
+def import_mapillary_photo(key, token):
+    digest = f"mapillary:{key}"
+    if CONTRIBUTIONS.has_photo(digest):
+        return None, ("info", "Esta fotografia do Mapillary já foi analisada.")
+    photo = fetch_photo(key, token)
+    if photo.coordinates is None:
+        raise MapillaryPhotoError("A API não devolveu coordenadas para esta fotografia.")
+    with decode_photo(photo.data) as image:
+        detections = get_analyzer().analyze(image, already_anonymized=True, panoramic=photo.panoramic)
+    if not detections:
+        return None, ("info", "A análise não encontrou mobiliário urbano nesta fotografia.")
+    credit = {
+        "imagem_id": key, "imagem_url": photo_link(key), "autor": photo.author, "licenca": PHOTO_LICENSE,
+    }
+    items = [({**props, **credit}, crop, preview) for props, crop, preview in detections]
+    upload_id = CONTRIBUTIONS.publish(digest, *photo.coordinates, "gps_mapillary", items)
+    if upload_id is None:
+        return None, ("info", "Esta fotografia do Mapillary já foi analisada.")
+    return (upload_id, photo.coordinates), ("success", f"Publicada no mapa ({len(items)} deteções).")
+
+
+def render_mapillary_import(revision):
+    token = mapillary_token()
+    raw = st.text_input("Link ou ID da fotografia do Mapillary", key=f"mapillary-image-{revision}")
+    key = image_key(raw)
+    if not token:
+        st.caption("Configura MAPILLARY_TOKEN no ficheiro .env do servidor para importar fotografias.")
+    if raw and not key:
+        st.caption("Usa um ID numérico ou um link de fotografia com pKey.")
+    if not st.button(
+        "Analisar e publicar do Mapillary", icon=":material/add_a_photo:", type="primary",
+        width="stretch", disabled=not (token and key),
+    ):
+        return
+    with st.spinner("A obter a fotografia e a executar OWLv2, SigLIP e SAM 2…"):
+        try:
+            published, message = import_mapillary_photo(key, token)
+        except (SegmentationError, ValueError) as error:
+            published, message = None, ("error", str(error))
+        except Exception:
+            LOGGER.exception("Erro ao analisar uma fotografia do Mapillary")
+            published, message = None, ("error", "Não foi possível analisar e publicar a fotografia.")
+    finish_publication([published] if published else [], [message], revision)
+
+
 @st.dialog("Adicionar fotografias", width="large", on_dismiss=close_upload)
 def render_upload():
     st.caption("O GPS da foto situa os elementos no mapa. A localização e os recortes anonimizados ficam públicos.")
     for message in st.session_state.get("upload_errors", []):
         st.error(message)
     revision = st.session_state.get("upload_revision", 0)
+    source = st.radio("Origem da fotografia", ["Ficheiros", "Mapillary"], horizontal=True, key="photo-source")
+    if source == "Mapillary":
+        render_mapillary_import(revision)
+        return
     files = st.file_uploader(
         "Fotografias de mobiliário urbano",
         type=UPLOAD_TYPES,
@@ -233,6 +295,7 @@ def render_upload():
             else:
                 results.append(("info", f"{file.name} · Esta fotografia já foi enviada."))
         except PrivacyModelsMissing as error:
+            LOGGER.exception("Erro ao preparar a anonimização de uma contribuição fotográfica")
             results.append(("error", f"{file.name} · {error}"))
         except SegmentationError as error:
             LOGGER.exception("Erro na segmentação de uma contribuição fotográfica")
@@ -240,15 +303,7 @@ def render_upload():
         except Exception:
             LOGGER.exception("Erro ao processar uma contribuição fotográfica")
             results.append(("error", f"{file.name} · Não foi possível analisar e publicar a fotografia."))
-    errors = [message for level, message in results if level == "error"]
-    st.session_state["upload_errors"] = errors
-    st.session_state["upload_messages"] = [(level, message) for level, message in results if level != "error"]
-    st.session_state["upload_open"] = bool(errors)
-    if not errors:
-        st.session_state["upload_revision"] = revision + 1
-    if published:
-        st.session_state["new_contribution"] = published[0]
-    st.rerun()
+    finish_publication(published, results, revision)
 
 
 def render_photo(preview):
@@ -285,51 +340,73 @@ def photo_jobs():
 
 
 @st.fragment(run_every=0.5)
-def render_photo_progress(job):
+def render_photo_progress(job, downloading):
     if job.done():
         st.rerun()
-    st.caption("A gerar a máscara com o SAM 2…")
+    if downloading:
+        st.caption("A obter a fotografia do Mapillary e a preparar a máscara…")
+    else:
+        st.caption("A gerar a máscara com o SAM 2…")
 
 
-def render_selected_photo(props, preview):
-    if preview is None:
-        st.caption("A fotografia usada na deteção ainda não está disponível no catálogo local.")
+def render_selected_photo(props, preview, *, token=""):
+    if preview is None and not token:
+        if image_key(props.get("imagem_id")):
+            st.caption("A fotografia falta em data/images. Configura MAPILLARY_TOKEN para a carregar pela API.")
+        else:
+            st.caption("A fotografia usada na deteção ainda não está disponível.")
         return
-    if preview.mask or not preview.box:
+    if preview and (preview.mask or not preview.box):
         render_photo(preview)
+        if not preview.mask and props.get("imagem_bbox"):
+            st.caption("A caixa da deteção não pôde ser alinhada com esta versão da fotografia.")
         return
 
     jobs = photo_jobs()
-    job = jobs.submit(CATALOG_PATH, props, preview)
+    job = jobs.submit(CATALOG_PATH, props, preview, token=token)
     if job is None:
-        render_photo(preview)
+        if preview:
+            render_photo(preview)
         st.info("Há várias fotografias em análise. Tenta novamente daqui a pouco.")
     elif not job.done():
-        render_photo(preview)
-        render_photo_progress(job)
+        if preview:
+            render_photo(preview)
+        render_photo_progress(job, preview is None)
         return
     else:
         result = job.result()
-        render_photo(result.preview)
+        if result.preview:
+            render_photo(result.preview)
         if not result.notice:
             return
         st.caption(result.notice)
 
     if st.button("Tentar novamente", icon=":material/refresh:", key=f"retry-photo-{props['id']}"):
-        jobs.submit(CATALOG_PATH, props, preview, retry=True)
+        jobs.submit(CATALOG_PATH, props, preview, token=token, retry=True)
         st.rerun()
+
+
+def render_photo_source(photo):
+    if photo.get("autor"):
+        st.caption(f"Fotografia por {photo['autor']} · {photo.get('licenca') or PHOTO_LICENSE}")
+    key = image_key(photo.get("imagem_id"))
+    if key:
+        st.link_button("Ver no Mapillary", photo_link(key), icon=":material/photo_library:", width="stretch")
+    elif photo.get("imagem_url"):
+        st.link_button("Abrir fotografia", photo["imagem_url"], icon=":material/photo_library:", width="stretch")
 
 
 def render_image(feature: dict) -> None:
     props = feature.get("properties", {})
     if props.get("fonte") == SOURCE:
-        preview = load_catalog_preview(CATALOG_PATH, props)
+        preview = load_catalog_preview(CATALOG_PATH, props, prepared_only=True)
         if preview is None:
             preview = CONTRIBUTIONS.preview(props["id"], props.get("imagem_bbox_relativa"))
             if preview and props.get("segmentacao_modelo") != SAM2_MODEL:
                 preview = PhotoPreview(preview.image, box=preview.box)
         if preview:
             render_selected_photo(props, preview)
+            render_photo_source(props)
             return
         crop = CONTRIBUTIONS.crop(props["id"])
         if crop:
@@ -337,7 +414,11 @@ def render_image(feature: dict) -> None:
         else:
             st.caption("A análise desta fotografia não identificou elementos para recortar.")
         return
-    photos = [view for view in catalog_photo_views(props) if has_catalog_preview(CATALOG_PATH, view)]
+    token = mapillary_token()
+    photos = [
+        view for view in catalog_photo_views(props)
+        if has_catalog_preview(CATALOG_PATH, view) or (token and image_key(view.get("imagem_id")))
+    ]
     photo = photos[0] if photos else props
     if len(photos) > 1:
         index = st.selectbox(
@@ -348,21 +429,11 @@ def render_image(feature: dict) -> None:
         photo = photos[index]
     try:
         preview = load_catalog_preview(CATALOG_PATH, photo) if photos else None
-    except (OSError, ValueError):
+    except (OSError, ValueError, Image.DecompressionBombError):
         LOGGER.exception("Não foi possível abrir a fotografia local do catálogo")
         preview = None
-    image_id = photo.get("imagem_id")
-    image_url = photo.get("imagem_url")
-    render_selected_photo(photo, preview)
-    if photo.get("autor") and preview:
-        st.caption(f"Fotografia por {photo['autor']} · {photo.get('licenca') or 'CC BY-SA 4.0'}")
-    if str(image_id).isdecimal():
-        st.link_button(
-            "Ver no Mapillary", f"https://www.mapillary.com/app/?pKey={quote(str(image_id))}",
-            icon=":material/photo_library:", width="stretch",
-        )
-    elif image_url:
-        st.link_button("Abrir fotografia", image_url, icon=":material/photo_library:", width="stretch")
+    render_selected_photo(photo, preview, token=token if image_key(photo.get("imagem_id")) else "")
+    render_photo_source(photo)
 
 
 @st.cache_data
@@ -407,11 +478,6 @@ def render_details(feature: dict) -> None:
     st.html(
         f'<dl class="item-meta">{metadata}<div class="item-meta__full"><dt>Coordenadas</dt>'
         f'<dd>{latitude:.6f}, {longitude:.6f}</dd></div></dl>'
-    )
-    st.link_button(
-        "Abrir no OpenStreetMap",
-        f"https://www.openstreetmap.org/?mlat={latitude}&mlon={longitude}#map=19/{latitude}/{longitude}",
-        icon=":material/map:", width="stretch",
     )
 
 

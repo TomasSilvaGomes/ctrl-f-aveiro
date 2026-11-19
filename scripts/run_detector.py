@@ -54,15 +54,20 @@ STD = torch.tensor([0.26862954, 0.26130258, 0.27577711]).view(1, 3, 1, 1)
 
 def prepare(row):
     """Lê a imagem e devolve uma lista de vistas 960x960 + info para desfazer."""
-    im = np.asarray(Image.open(DATA_DIR / "images" / row["file"]).convert("RGB"))
-    H, W = im.shape[:2]
-    views = []
-    if row["is_pano"] == "True":
-        for yaw in YAWS:
-            views.append((perspective_view(im, yaw, FOV, SIZE), {"pano": True, "W": W, "H": H, "yaw": yaw}))
-    else:
-        views.append(prepare_flat(Image.fromarray(im)))
+    with Image.open(DATA_DIR / "images" / row["file"]) as source:
+        views = list(prepare_views(source.convert("RGB"), panoramic=row["is_pano"] == "True"))
     return row, views
+
+
+def prepare_views(image, *, panoramic=False):
+    if not panoramic:
+        yield prepare_flat(image)
+        return
+    pixels = np.asarray(image)
+    for yaw in YAWS:
+        yield perspective_view(pixels, yaw, FOV, SIZE), {
+            "pano": True, "W": image.width, "H": image.height, "yaw": yaw,
+        }
 
 
 def prepare_flat(image):

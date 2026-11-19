@@ -104,14 +104,18 @@ classifica cada recorte e o SAM 2 gera a máscara a partir da caixa de deteção
 As deteções partilham a posição da captura. Se a análise não encontrar elementos,
 o mapa mostra um marcador de fotografia.
 
-Para publicar recortes, obtém os dois modelos EgoBlur Gen1 na página da Meta,
-que pede um endereço de email para o download. [Download do EgoBlur](https://www.projectaria.com/tools/egoblur/)
+Antes de publicar ficheiros enviados, a app cobre as regiões identificadas como rostos
+ou matrículas e guarda apenas os JPEG resultantes, sem os metadados do original.
+Se os pesos do EgoBlur Gen1 estiverem instalados, a app usa-os. Guarda
+`ego_blur_face_gen1.jit` e `ego_blur_lp_gen1.jit` em `weights/egoblur/` ou indica outra pasta
+com `CTRL_F_EGOBLUR_DIR`. Os nomes antigos `ego_blur_face.jit` e `ego_blur_lp.jit` também
+são aceites. [Download do EgoBlur](https://www.projectaria.com/tools/egoblur/)
 
-Coloca os ficheiros em `weights/egoblur/` ou indica outra pasta com
-`CTRL_F_EGOBLUR_DIR`. São necessários
-`ego_blur_face_gen1.jit` e `ego_blur_lp_gen1.jit`. Os nomes antigos
-`ego_blur_face.jit` e `ego_blur_lp.jit` também são aceites. A app mascara os rostos e
-matrículas que os modelos detetam antes de guardar ficheiros JPEG sem os metadados do original.
+Quando faltam os pesos do EgoBlur, a app usa o YuNet para os rostos
+e o detetor de matrículas do Open Image Models. No primeiro uso, descarrega os
+pesos públicos para `weights/privacy`. Os modelos correm localmente.
+[YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet)
+[Open Image Models](https://github.com/ankandrew/open-image-models#plate-detection)
 
 A ficha mostra primeiro a fotografia e permite escolher outra se houver várias vistas.
 Nos pontos do catálogo inicial, a app usa a deteção já calculada pelo OWLv2 e
@@ -120,11 +124,16 @@ classificada pelo SigLIP. Ao abrir uma vista com a fotografia disponível em
 A fotografia e a máscara ficam em `data/catalogo/previews/sam2` para as próximas
 aberturas. O seletor sobre a fotografia mostra ou esconde a máscara.
 
-O Mapillary fornece as fotografias de entrada durante a recolha do catálogo inicial.
-O mapa lê os resultados da pipeline e corre sem token do Mapillary. Para instalar
-o SAM 2.1 Hiera Tiny em `weights/sam2` e preparar em lote as máscaras das fotografias
-locais, corre o seguinte comando. A variável `CTRL_F_SAM2_DIR` permite indicar
-outra pasta para os pesos.
+Quando falta a fotografia local de uma deteção, a app tenta obter essa imagem pela
+API do Mapillary e segmentá-la com a caixa já guardada. Configura `MAPILLARY_TOKEN`
+no ficheiro `.env` do servidor para ativar esta opção. Em **Adicionar fotografias →
+Mapillary**, cola o link ou ID de outra fotografia para a analisar com OWLv2, SigLIP e
+SAM 2. As deteções novas usam a posição da captura e a ficha inclui o crédito da
+fotografia. Esta opção usa as fotografias publicadas com o desfoque do Mapillary.
+
+Para instalar o SAM 2.1 Hiera Tiny em `weights/sam2` e preparar em lote as máscaras
+das fotografias locais, corre o seguinte comando. A variável `CTRL_F_SAM2_DIR`
+permite indicar outra pasta para os pesos.
 
 ```powershell
 .\.venv\Scripts\python.exe scripts/preparar_previews.py --descarregar-modelo
