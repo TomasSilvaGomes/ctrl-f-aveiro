@@ -40,11 +40,12 @@
 | **OWLv2** (`google/owlv2-*`) | Apache 2.0 | 🟢 | Deteção zero-shot por texto. |
 | **Grounding DINO tiny** (`IDEA-Research/grounding-dino-tiny`) | Apache 2.0 | 🟢 | Deteção zero-shot por texto. (Grounding DINO 1.5/1.6 são só API → excluídos.) |
 | **YOLOE** (THU-MIG, via Ultralytics) | AGPL-3.0 | 🟡 | Copyleft forte, incluindo uso em rede: se entrar, **todo o nosso código passa a AGPL-3.0** e o código-fonte tem de estar disponível a quem usa a aplicação. Compatível com "código aberto", mas é uma decisão da equipa. |
-| **Mask2Former Swin-L Mapillary Vistas** | Código MIT; pesos HF marcados "other"; treinados no Vistas (CC BY-NC-SA) | 🟠 | Não é claro se os pesos herdam o "NC". Usar no benchmark; perguntar aos mentores antes de o tornar dependência final. |
-| **DINOv2** (`facebook/dinov2-base`) | Apache 2.0 (desde ago/2023, código e pesos) | 🟢 | Semelhança imagem-imagem com desenhos de referência (em teste). |
+| **Mask2Former Swin-L Mapillary Vistas** | Código MIT; pesos HF marcados "other"; treinados no Vistas (CC BY-NC-SA) | 🟠 | Não é claro se os pesos herdam o "NC". Testado a 19/11 como alternativa ao SAM 2 no contorno (`posicao.py contorno --sam mask2former`): mesma qualidade (iluminação até 5 m 63% vs 63%) e tempo igual ao SAM 2 small → **não compensa**; fica só como comparação. |
+| **DINOv2** (`facebook/dinov2-base`) | Apache 2.0 (desde ago/2023, código e pesos) | 🟢 | Testado a 17/11 nos desenhos dos sinais (23–38% contra 78% do SigLIP) e **retirado** a 19/11. |
 | DINOv3 | Licença própria Meta ("DINOv3 License"), com formulário | 🔴 ⚪ | Evitar; DINOv2 chega. |
 | **CLIP** (OpenAI) / **SigLIP** (Google) | MIT / Apache 2.0 | 🟢 ⚪ | Classificação zero-shot de subtipo. Confirmar no model card do checkpoint escolhido. |
-| **EgoBlur** (rostos + matrículas) | Apache 2.0 | 🟢 ⚪ | O download pede aceitação de um acordo — ler o texto ao descarregar e registar aqui. |
+| **EgoBlur Gen2** (rostos + matrículas) | Apache 2.0 — código (GitHub) e pesos. O "EgoBlur Model License Agreement" que se aceita no download (projectaria.com/tools/egoblur/license) é o texto da Apache 2.0, sem termos extra; a FAQ diz "Both the Gen 2 face and license plate models are licensed under Apache 2.0" (confirmado a 19/11) | 🟢 | Integrado em `comum.Desfocar` e no `dados.py video` (pesos `weights/ego_blur_*_gen2.jit`, fora do git). Se se redistribuírem os pesos: incluir a licença Apache 2.0; não usar marcas da Meta. |
+| **SAM 2.1** (`facebook/sam2.1-hiera-*`) | Apache 2.0 | 🟢 | Contorno dos objetos (`posicao.py contorno`); small ≈ large na qualidade e 2,3× mais rápido. |
 | **Depth Anything V2 Small** | Apache 2.0 | 🟢 | Só o Small. **Base/Large/Giant são CC BY-NC 4.0 → 🔴.** |
 | EasyOCR / PaddleOCR | Apache 2.0 | 🟢 | **Retirado a 17/11**: o SigLIP lê o número dos limites melhor (97% contra 31%). |
 | Mapillary Traffic Sign Dataset (MTSD) | Uso académico / não comercial | 🔴 | Não precisamos (sem treino). |
@@ -57,6 +58,7 @@
 | Software | Licença | Estado | Notas |
 |---|---|---|---|
 | PyTorch | BSD-3 | 🟢 | RTX 5060 Ti exige build CUDA 12.8 (`cu128`). |
+| **OpenSfM** (reconstrução 3D da Mapillary) | BSD-2 no repositório original `mapillary/OpenSfM` | 🟢 | Usado desde 19/11 em `dados.py poses --opensfm` (imagem Docker feita com o `Dockerfile.ubuntu24` do repositório original; dependências de sistema Ceres/OpenCV/Eigen com licenças BSD/Apache/MPL; `fpdf2` LGPL só nos relatórios do próprio OpenSfM, que não usamos). Usar só o original BSD: as cópias OpenDroneMap/WebODM têm alterações **AGPL-3.0** → 🔴. |
 | Hugging Face `transformers` | Apache 2.0 | 🟢 | |
 | FastAPI | MIT | 🟢 | |
 | Leaflet | BSD-2 | 🟢 | |
@@ -85,4 +87,4 @@
 - Mask2Former Vistas (HF): https://huggingface.co/facebook/mask2former-swin-large-mapillary-vistas-semantic
 - DINOv2 Apache 2.0: https://ai.meta.com/blog/dinov2-facet-computer-vision-fairness-evaluation/
 - Depth Anything V2: https://docs.lightly.ai/train/stable/depth_estimation.html
-- EgoBlur: https://huggingface.co/projectaria/EgoBlur · https://projectaria.com/tools/egoblur
+- EgoBlur: https://huggingface.co/projectaria/EgoBlur · https://projectaria.com/tools/egoblur · https://www.projectaria.com/tools/egoblur/license/ · https://github.com/facebookresearch/EgoBlur

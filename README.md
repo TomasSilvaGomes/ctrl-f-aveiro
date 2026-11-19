@@ -21,7 +21,7 @@ estão em [config/taxonomia.yaml](config/taxonomia.yaml).
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-Copy-Item .env.example .env        # e colar o teu token da Mapillary no .env
+Set-Content .env "MAPILLARY_TOKEN=MLY|..." -Encoding ascii  # token da Mapillary (dashboard/developers); ascii = sem BOM
 .\.venv\Scripts\python.exe scripts\dados.py modelos
 $env:PYTHONIOENCODING = "utf-8"    # acentos no terminal
 ```
@@ -35,22 +35,31 @@ O `.env` é pessoal e **nunca** vai para o repositório.
 .\.venv\Scripts\python.exe scripts\dados.py amostra descarregar --ids-from data\meta\sample_images.csv --n 100000 --size original --workers 10
 .\.venv\Scripts\python.exe scripts\dados.py poses          # rotação da câmara + pontos 3D (pasta sfm/)
 .\.venv\Scripts\python.exe scripts\dados.py referencias    # pontos Mapillary/OSM (só para medir)
-# ruas piloto (fotos seguidas), cada uma na sua pasta
-foreach ($p in "piloto_rua", "piloto_sequencia", "piloto_frontal") {
-  $env:DATA_DIR = "data\$p"
-  .\.venv\Scripts\python.exe scripts\dados.py amostra descarregar --ids-from data\$p\meta\sample_images.csv --n 100000 --size original
-  .\.venv\Scripts\python.exe scripts\dados.py poses
-}
-Remove-Item Env:DATA_DIR
+# rua piloto (fotos seguidas num só sentido, pasta própria), ex.: Av. Dr. Lourenço Peixinho
+.\.venv\Scripts\python.exe scripts\dados.py sequencia --inicio 40.642207,-8.651474 --direcao 40.644088,-8.639894 `
+  --comprimento 1000 --largura 12 --tipo 360 --sentido --passagens 1 --saida data\piloto_rua
+$env:DATA_DIR = "data\piloto_rua"; .\.venv\Scripts\python.exe scripts\dados.py poses; Remove-Item Env:DATA_DIR
 ```
 
 ## 3. Correr a pipeline (um comando)
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\pipeline.py                         # tudo (~15 min com GPU; contorno ~1h30 na 1.ª vez)
+.\.venv\Scripts\python.exe scripts\pipeline.py                         # tudo (~15 min com GPU; contorno com o SAM 2 small, por omissão)
 .\.venv\Scripts\python.exe scripts\pipeline.py --desde classificar     # sem voltar a correr o detetor
 .\.venv\Scripts\python.exe scripts\pipeline.py --dados data\piloto_rua --triangulacao --imagens 6
+# vídeo gravado na rua (com trilho GPX): cortar em fotos e correr tudo
+.\.venv\Scripts\python.exe scripts\dados.py video gravacao.mp4 --gpx trilho.gpx --saida data\video_rua
+$env:DATA_DIR = "data\video_rua"
+.\.venv\Scripts\python.exe scripts\dados.py poses --opensfm    # rotação + pontos 3D NOSSOS (OpenSfM em Docker, sem API)
+Remove-Item Env:DATA_DIR
+.\.venv\Scripts\python.exe scripts\pipeline.py --dados data\video_rua --triangulacao
+# imagens para a app: uma por elemento do catálogo, já desenhada (~30 s)
+.\.venv\Scripts\python.exe scripts\imagens.py app
 ```
+
+A imagem Docker do OpenSfM faz-se uma vez (Docker Desktop ligado):
+`git clone --recurse-submodules https://github.com/mapillary/OpenSfM` e
+`docker build -f OpenSfM/Dockerfile.ubuntu24 -t opensfm:ctrlf OpenSfM`.
 
 Passos, por ordem (cada um também se corre sozinho; `--desde` / `--ate` escolhem o intervalo):
 
@@ -73,21 +82,36 @@ do limite recomendado do GitHub) não está no repositório; numa cópia nova, c
 `detetar` (~12 min com GPU) antes de `--desde classificar`.
 O que se volta a gerar e é pesado não vai para o repositório: `preds/siglip_cache.npz` (memória
 dos recortes, a primeira corrida cria-a), `sfm/` (pontos 3D) e `viz/` (imagens).
-**Tudo de uma vez no tmux (Ubuntu/WSL):** `bash scripts/sessao_tmux.sh`.
 
-## 4. Os scripts
+## 4. A app (mapa e fichas, pasta `app/`)
+
+```powershell
+.\.venv\Scripts\python.exe scripts\imagens.py app        # recortes já desenhados (~30 s): data/app/
+.\.venv\Scripts\python.exe -m streamlit run apppp.py   # http://localhost:8501
+```
+
+- Lê `data/app/catalogo.geojson` (o catálogo + campo `imagem`); sem ele, `data/catalogo/catalogo.geojson`.
+  Outro ficheiro: variável `CTRL_F_CATALOG_PATH`. Ao carregar num ícone mostra o recorte da pipeline
+  (contentores com o contorno SAM 2, sinais com o desenho da DGV); nas ilhas, um por contentor.
+- Fotos enviadas na app: mesma cadeia da pipeline (`detetar.py` → `classificar.py` → `sinais.py`), caras e
+  matrículas tapadas com o EgoBlur Gen2 (`comum.Desfocar`) e contorno com o SAM 2 small (cache do Hugging Face).
+- As edições feitas na app ficam em `data/app/catalogo.geojson` e `contribuicoes.sqlite3`: voltar a correr
+  `imagens.py app` refaz o catálogo da app (as edições no GeoJSON perdem-se).
+- Token da Mapillary (importar fotos pelo ID) só no `.env` do servidor.
+
+## 5. Os scripts
 
 | Ficheiro | Comandos | Para quê |
 |---|---|---|
 | `pipeline.py` | `--desde` · `--ate` · `--dados` | Corre os passos por ordem |
-| `dados.py` | `amostra` (indice · selecionar · descarregar) · `sequencia` · `referencias` · `poses` · `modelos` | Tudo o que descarrega: fotos, ruas seguidas, pontos para medir, pontos 3D, modelos |
+| `dados.py` | `amostra` (indice · selecionar · descarregar) · `sequencia` · `referencias` · `poses` · `modelos` · `video` | Tudo o que traz dados: fotos, ruas seguidas, pontos para medir, pontos 3D, modelos; e um vídeo próprio + GPX → uma foto a cada N metros |
 | `detetar.py` | | Encontra os objetos (OWLv2) |
 | `classificar.py` | | Tipo de cada objeto (SigLIP) |
-| `sinais.py` | `limites` · `codigo` · `extrair` · `testar` | Número dos limites · código oficial · desenhos do PDF da DGV · medir o código |
+| `sinais.py` | `limites` · `codigo` · `extrair` | Número dos limites · código oficial · desenhos do PDF da DGV |
 | `posicao.py` | `contorno` · `calcular` · `triangulacao` | Pé real (SAM 2) · posição com 1 foto · posição com várias fotos |
 | `catalogo.py` | `--limiares` | Catálogo final (GeoJSON + CSV) |
 | `avaliar.py` | `erros` · `confianca` · `prompts` | Relatório de erros · escolha dos limiares de confiança · escolha das frases dos modelos |
-| `imagens.py` | `final` · `owl` · `foto` · `contorno` · `folha` · `guardar` | Fotos com caixas · detetor em bruto · foto qualquer · caixa vs contorno · rever e guardar exemplos |
+| `imagens.py` | `final` · `owl` · `foto` · `contorno` · `folha` · `guardar` · `app` | Fotos com caixas · detetor em bruto · foto qualquer · caixa vs contorno · rever e guardar exemplos · **uma imagem por elemento para a app** (`data/app/imagens/<id>.jpg` + `data/app/catalogo.geojson/.csv` com o campo `imagem`) |
 | `comum.py`, `mapillary.py` | | Peças partilhadas (não se correm sozinhas) |
 
 Ajuda de cada comando: `python scripts\<ficheiro>.py <comando> -h`.
@@ -95,7 +119,7 @@ Ajuda de cada comando: `python scripts\<ficheiro>.py <comando> -h`.
 **Outra pasta de dados:** `--dados data\piloto_rua` no `pipeline.py`, ou `$env:DATA_DIR = "data\piloto_rua"`
 antes de qualquer script.
 
-## 5. Pastas
+## 6. Pastas
 
 ```
 config/            taxonomia.yaml (classes, frases, regras, limiares), frases candidatas, vocabulário
@@ -106,13 +130,16 @@ data/preds/        saídas da pipeline (deteções, tipos, contornos, posições
 data/catalogo/     catálogo final (GeoJSON + CSV)
 data/relatorios/   relatórios de erros, confiança, escolha das frases
 data/referencias/  fotos de referência por classe (créditos em fontes*.csv) e desenhos dos sinais da DGV
-data/piloto_*/     ruas piloto (fotos seguidas), com a mesma estrutura
+data/app/          catálogo + recortes para a app (imagens.py app)
+data/images/, data/sfm/  fotos e pontos 3D (só locais)
 ```
 
-## 6. Regras (ficha do desafio)
+## 7. Regras (ficha do desafio)
 
 - Fotos Mapillary: **CC BY-SA 4.0** — mostrar sempre autor + link (o catálogo guarda-os).
-- **Rostos e matrículas** nunca guardados nem mostrados (a Mapillary já os desfoca; desfocar antes de mostrar recortes).
+- **Rostos e matrículas** nunca guardados nem mostrados. A Mapillary já os desfoca; os nossos vídeos passam pelo
+  **EgoBlur Gen2** (`comum.Desfocar`) antes de gravar cada foto. Pesos: descarregar em https://www.projectaria.com/tools/egoblur
+  e pôr `ego_blur_face_gen2.jit` e `ego_blur_lp_gen2.jit` em `weights/` (fora do git).
 - Pontos Mapillary e OpenStreetMap (ODbL) servem **só para medir**, nunca entram no catálogo.
 - Proibido: Google Street View; código AGPL (YOLOE e restantes modelos Ultralytics, PyMuPDF);
   pesos Mapillary Vistas / Objects365. O YOLO-World (GPL-3.0) foi testado à parte e posto de parte.

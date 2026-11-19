@@ -7,8 +7,10 @@ IMAGENS para ver os resultados:
   contorno  caixa ao lado do contorno SAM 2 (pé real e pontos 3D usados)
   folha     folha de recortes numerados de um tipo do catálogo (para rever à mão)
   guardar   guarda recortes escolhidos da folha como referências de Aveiro
+  app       uma imagem por elemento do catálogo, já desenhada, + catálogo com o campo "imagem"
 
 Uso:
+    python scripts/imagens.py app
     python scripts/imagens.py final --todas
     python scripts/imagens.py contorno --n 9
     python scripts/imagens.py folha --subtipo candeeiro
@@ -146,14 +148,15 @@ def contour_key(d):
 
 
 def load_polys():
-    """Contornos guardados pelo passo contorno (preds/contorno_cache.jsonl): chave -> polígonos."""
-    p = DATA_DIR / "preds" / "contorno_cache.jsonl"
+    """Contornos guardados pelo passo contorno: chave -> polígonos. Lê a cache do SAM 2 large
+    (contorno_cache.jsonl) e depois as dos outros modelos (contorno_cache_<modelo>.jsonl, --sam)."""
+    caches = sorted((DATA_DIR / "preds").glob("contorno_cache*.jsonl"), key=lambda p: p.name != "contorno_cache.jsonl")
     out = {}
-    if p.exists():
+    for p in caches:
         for ln in open(p, encoding="utf-8"):
             r = json.loads(ln)
             if r.get("poly"):
-                out[r["k"]] = r["poly"]
+                out.setdefault(r["k"], r["poly"])
     return out
 
 
@@ -620,6 +623,185 @@ def main_folhas(argv=None):
 
 
 ####################################################################################################
+# APP  (uma imagem por elemento do catálogo, para a app abrir ao carregar no ícone)
+####################################################################################################
+# Para cada elemento: recorte LIMPO da melhor foto à volta do objeto (sem desenhos nem texto) e,
+# à parte, a camada da segmentação (PNG transparente, mesmo tamanho, no estilo da app: azul) quando
+# há contorno SAM 2 guardado (contentores). A app mostra a foto com a camada por cima e um botão para
+# a ligar/desligar; sem contorno mostra a caixa ("Área detetada"). O autor/licença aparece na app
+# por baixo da foto (CC BY-SA 4.0). Ilhas: os contentores da ilha que se veem nessa foto; cada
+# contentor da ilha tem também a sua imagem.
+#
+#   -> data/app/imagens/<id>.jpg  (+ <id>_mascara.png;  <id>_<n>.jpg para cada contentor de uma ilha)
+#   -> data/app/catalogo.geojson e catalogo.csv: o catálogo com os campos "imagem", "imagem_mascara"
+#      (ou vazio) e "imagem_caixa" (caixa do objeto no recorte, 0–1: esquerda, topo, direita, fundo)
+#
+# Tudo pré-calculado: abrir uma ficha é ler um JPG pequeno, sem modelos a correr na app.
+#
+#     python scripts/imagens.py app                       # 480 x 360 px
+#     python scripts/imagens.py app --largura 640 --altura 480 --processos 8
+
+APP_DIR = DATA_DIR / "app"
+
+
+def _janela(boxes, W, H, pano, aspect):
+    """Janela (x0, y0, x1, y1) à volta das caixas, com margem, na proporção aspect (largura/altura)."""
+    x0, y0 = min(b[0] for b in boxes), min(b[1] for b in boxes)
+    x1, y1 = max(b[2] for b in boxes), max(b[3] for b in boxes)
+    w = max((x1 - x0) * 2.2, (y1 - y0) * 1.5 * aspect, 0.06 * W if pano else 0.25 * W)
+    h = w / aspect
+    if h > H:
+        h, w = H, H * aspect
+    cx = (x0 + x1) / 2
+    top = min(max(0.0, (y0 + y1) / 2 - h / 2), H - h)
+    left = cx - w / 2
+    if not pano:
+        w = min(w, W)
+        left = min(max(0.0, left), W - w)
+    return left, top, left + w, top + h
+
+
+def _recorte(im, x0, y0, x1, y1):
+    """Recorte que pode passar a costura da panorâmica 360° (coordenadas 'desenroladas')."""
+    W = im.width
+    out = Image.new("RGB", (max(1, int(x1 - x0)), max(1, int(y1 - y0))), (20, 20, 20))
+    for s in (-W, 0, W):
+        a, b = max(x0, s), min(x1, s + W)
+        if b > a:
+            out.paste(im.crop((int(a - s), int(y0), int(b - s), int(y1))), (int(a - x0), 0))
+    return out
+
+
+def _camada(silhueta):
+    """Silhueta (L, 0/255) -> camada PNG da app: azul (17,119,255) a 27% + contorno (92,218,255)."""
+    from PIL import ImageChops
+    borda = ImageChops.subtract(silhueta.filter(ImageFilter.MaxFilter(3)), silhueta.filter(ImageFilter.MinFilter(3)))
+    camada = Image.new("RGBA", silhueta.size, (17, 119, 255))
+    camada.putalpha(silhueta.point(lambda v: int(v * 0.27)))
+    contorno = Image.new("RGBA", silhueta.size, (92, 218, 255))
+    contorno.putalpha(borda)
+    return Image.alpha_composite(camada, contorno)
+
+
+def _desenhar_app(job):
+    """Uma foto -> recortes de todos os elementos que a usam. job = (ficheiro, pano, [pedidos], largura, altura).
+    Devolve [(saida, ficheiro da máscara ou None, caixa 0–1 no recorte)]."""
+    path, pano, pedidos, largura, altura = job
+    im = Image.open(path).convert("RGB")
+    W, H = im.size
+    feitos = []
+    for p in pedidos:
+        objs = p["objetos"]                       # [{bbox, cat, poly}]
+        x0, y0, x1, y1 = _janela([o["bbox"] for o in objs], W, H, pano, largura / altura)
+        s = min(largura / (x1 - x0), altura / (y1 - y0))
+        rw, rh = int((x1 - x0) * s), int((y1 - y0) * s)
+        ox, oy = (largura - rw) // 2, (altura - rh) // 2
+        canvas = Image.new("RGB", (largura, altura), (20, 20, 20))
+        canvas.paste(_recorte(im, x0, y0, x1, y1).resize((rw, rh), Image.LANCZOS), (ox, oy))
+        canvas.save(p["saida"], quality=85)
+        tx = lambda u: (u - x0) * s + ox  # noqa: E731
+        ty = lambda v: (v - y0) * s + oy  # noqa: E731
+        mascara = None
+        if any(o["poly"] for o in objs):
+            sil = Image.new("L", canvas.size, 0)
+            ds = ImageDraw.Draw(sil)
+            for o in objs:
+                cxb = (o["bbox"][0] + o["bbox"][2]) / 2
+                for poly in o["poly"] or ():
+                    mu = sum(u for u, _ in poly) / len(poly)
+                    sh = round((cxb - mu) / W) * W if pano else 0
+                    ds.polygon([(tx(u + sh), ty(v)) for u, v in poly], fill=255)
+            mascara = p["saida"][:-4] + "_mascara.png"
+            _camada(sil).save(mascara, optimize=True)
+        bx0 = min(tx(o["bbox"][0]) for o in objs) / largura
+        by0 = min(ty(o["bbox"][1]) for o in objs) / altura
+        bx1 = max(tx(o["bbox"][2]) for o in objs) / largura
+        by1 = max(ty(o["bbox"][3]) for o in objs) / altura
+        caixa = [round(min(max(v, 0.0), 1.0), 4) for v in (bx0, by0, bx1, by1)]
+        feitos.append((p["saida"], mascara, caixa))
+    return feitos
+
+
+def cmd_app(args):
+    import time
+    from concurrent.futures import ProcessPoolExecutor
+    t0 = time.time()
+    imgs, polys = load_imgs(), load_polys()
+    with open(DATA_DIR / "catalogo" / "catalogo.geojson", encoding="utf-8") as fh:
+        gj = json.load(fh)
+    out = APP_DIR / "imagens"
+    out.mkdir(parents=True, exist_ok=True)
+    key = lambda iid, b: f"{iid}|" + ",".join(str(int(round(v))) for v in b)  # noqa: E731 (= contour_key)
+    pedidos = {}                                   # imagem_id -> [pedido]
+    for antigo in out.glob("*"):                   # recomeça do zero (sem imagens de corridas antigas)
+        antigo.unlink()
+
+    def pedido(nome, iid, objs):
+        if iid not in imgs:
+            return None
+        pedidos.setdefault(iid, []).append({"saida": str(out / nome), "objetos": objs})
+        return f"imagens/{nome}"
+
+    def obj(cat, iid, b):
+        return {"bbox": b, "cat": cat, "poly": polys.get(key(iid, b)) if cat == "residuos" else None}
+
+    alvos = []                                     # (dicionário a completar: elemento ou contentor)
+    n_el = n_it = 0
+    for ft in gj["features"]:
+        e = ft["properties"]
+        if e.get("itens"):
+            vis = [it for it in e["itens"] if it["imagem_id"] == e["imagem_id"]] or e["itens"][:1]
+            e["imagem"] = pedido(f"{e['id']}.jpg", e["imagem_id"],
+                                 [obj("residuos", e["imagem_id"], it["imagem_bbox"]) for it in vis])
+            for k, it in enumerate(e["itens"], 1):
+                it["imagem"] = pedido(f"{e['id']}_{k}.jpg", it["imagem_id"],
+                                      [obj("residuos", it["imagem_id"], it["imagem_bbox"])])
+                alvos.append(it)
+                n_it += 1
+        else:
+            e["imagem"] = pedido(f"{e['id']}.jpg", e["imagem_id"], [obj(e["categoria"], e["imagem_id"], e["imagem_bbox"])])
+        alvos.append(e)
+        n_el += 1
+    jobs = [(str(DATA_DIR / "images" / imgs[iid]["file"]), imgs[iid]["is_pano"] == "True", ps, args.largura,
+             args.altura) for iid, ps in pedidos.items()]
+    print(f"{n_el} elementos + {n_it} contentores de ilhas · {len(jobs)} fotos a abrir ({args.processos} processos)",
+          flush=True)
+    feitos = {}                                    # "imagens/<nome>.jpg" -> (máscara, caixa)
+    with ProcessPoolExecutor(args.processos) as ex:
+        for k, res in enumerate(ex.map(_desenhar_app, jobs, chunksize=4), 1):
+            for saida, mascara, caixa in res:
+                feitos[f"imagens/{Path(saida).name}"] = (f"imagens/{Path(mascara).name}" if mascara else None, caixa)
+            if k % 500 == 0:
+                print(f"  {k}/{len(jobs)} fotos · {len(feitos)} imagens ({time.time() - t0:.0f} s)", flush=True)
+    for d in alvos:
+        d["imagem_mascara"], d["imagem_caixa"] = feitos.get(d.get("imagem"), (None, None))
+    with open(APP_DIR / "catalogo.geojson", "w", encoding="utf-8") as fh:
+        json.dump(gj, fh, ensure_ascii=False)
+    with open(DATA_DIR / "catalogo" / "catalogo.csv", encoding="utf-8-sig") as fh:
+        rows = list(csv.DictReader(fh))
+    por_id = {ft["properties"]["id"]: ft["properties"] for ft in gj["features"]}
+    extra = ["imagem", "imagem_mascara", "imagem_caixa"]
+    with open(APP_DIR / "catalogo.csv", "w", newline="", encoding="utf-8-sig") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(rows[0]) + extra)
+        w.writeheader()
+        for r in rows:
+            e = por_id.get(r["id"], {})
+            w.writerow({**r, **{c: json.dumps(e[c]) if isinstance(e.get(c), list) else (e.get(c) or "") for c in extra}})
+    tam = sum(f.stat().st_size for f in out.iterdir()) / 1e6
+    n_masc = sum(1 for m, _ in feitos.values() if m)
+    print(f"{len(feitos)} recortes ({n_masc} com segmentação) · {tam:.0f} MB em {time.time() - t0:.0f} s -> {out}")
+    print(f"-> {APP_DIR / 'catalogo.geojson'} · {APP_DIR / 'catalogo.csv'} (campos imagem, imagem_mascara, imagem_caixa)")
+
+
+def main_app(argv=None):
+    ap = argparse.ArgumentParser(description="uma imagem por elemento do catálogo, para a app")
+    ap.add_argument("--largura", type=int, default=480)
+    ap.add_argument("--altura", type=int, default=360)
+    ap.add_argument("--processos", type=int, default=8)
+    cmd_app(ap.parse_args(argv))
+
+
+####################################################################################################
 SECOES = {
     "final": (lambda a, c="final": main_ver([c, *a]), "final"),
     "owl": (lambda a, c="owl": main_ver([c, *a]), "owl"),
@@ -627,6 +809,7 @@ SECOES = {
     "contorno": (lambda a, c="contorno": main_ver([c, *a]), "contorno"),
     "folha": (lambda a, c="folha": main_folhas([c, *a]), "folha"),
     "guardar": (lambda a, c="guardar": main_folhas([c, *a]), "guardar"),
+    "app": (main_app, "uma imagem por elemento do catálogo (para a app)"),
 }
 
 

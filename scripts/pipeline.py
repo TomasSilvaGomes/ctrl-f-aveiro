@@ -45,6 +45,10 @@ def main():
     ap.add_argument("--imagens", type=int, default=0, help="desenha N fotos com as caixas no fim")
     ap.add_argument("--apenas-frontais", action="store_true", help="detetor: refaz só as fotos frontais")
     ap.add_argument("--sem-tiling", action="store_true", help="detetor: frontais sem as 2 metades")
+    ap.add_argument("--sam", default="small", help="contorno: small (por omissão) | large | base-plus | tiny")
+    ap.add_argument("--altura-camara", type=float, default=None,
+                    help="altura da câmara normal ao chão em m (telemóvel no tablier ~1,3; a pé ~1,4; "
+                         "por omissão 1,95 = carros da Mapillary)")
     args = ap.parse_args()
 
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
@@ -59,8 +63,8 @@ def main():
         "classificar": ["classificar.py"],
         "limites": ["sinais.py", "limites"],
         "codigo": ["sinais.py", "codigo"],
-        "contorno": ["posicao.py", "contorno"],
-        "posicao": ["posicao.py", "calcular"],
+        "contorno": ["posicao.py", "contorno", "--sam", args.sam],
+        "posicao": ["posicao.py", "calcular", *(["--h-persp", str(args.altura_camara)] if args.altura_camara else [])],
         "catalogo": ["catalogo.py"],
         "triangulacao": ["posicao.py", "triangulacao"] if args.triangulacao else None,
         "relatorio": ["avaliar.py", "erros"] if has_refs else None,

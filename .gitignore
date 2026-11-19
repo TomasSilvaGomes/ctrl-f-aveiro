@@ -20,13 +20,15 @@ data/*/viz/
 data/**/siglip_cache.npz
 data/referencias/banco_*.npz
 data/**/sfm/
-# folhas de recortes de fotos sem autor/link por recorte (CC BY-SA): ficam só locais
+data/**/opensfm/
+data/app/
+data/**/contribuicoes.sqlite3*
+data/**/previews/
 data/**/relatorios/confianca_*.jpg
 data/preds/owlv2.jsonl
 data/**/*.antes*
 data/piloto_*/ground_truth/*.geojson
 *.zip
-# candidatas da web ainda NÃO revistas (as boas passam para data/referencias/classes)
 data/referencias/recolha_web/
 
 # Experiências (ex.: YOLO-World, licença GPL/AGPL): fora do repositório até haver decisão
@@ -34,3 +36,4 @@ data/referencias/recolha_web/
 
 # pesos descarregados automaticamente (ex.: CLIP ViT-B/32 do YOLO-World)
 /weights/
+*.md

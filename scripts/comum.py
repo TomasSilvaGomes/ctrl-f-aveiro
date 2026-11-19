@@ -198,3 +198,102 @@ def rodrigues(v):
     k = v / th
     K = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
     return np.eye(3) + math.sin(th) * K + (1 - math.cos(th)) * K @ K
+
+
+####################################################################################################
+# PRIVACIDADE: desfocar caras e matrículas (EgoBlur, Meta, Apache 2.0)
+####################################################################################################
+# A Mapillary já desfoca as fotos dela; as NOSSAS (vídeo próprio) têm de ser desfocadas antes de
+# se guardarem. Pesos (EgoBlur Gen2): descarregar em https://www.projectaria.com/tools/egoblur
+# (pede aceitação dos termos) e pôr ego_blur_face_gen2.jit e ego_blur_lp_gen2.jit em weights/
+# (fora do git).
+# Método igual ao da demonstração oficial Gen2 (gen2/script/demo_ego_blur_gen2.py): imagem BGR
+# reduzida a 1200 px no lado maior, NMS 0,3, caixa +15%, elipse desfocada.
+# Limiares MAIS BAIXOS que os oficiais da câmara "camera-rgb" (cara 0,674 · matrícula 0,745), porque
+# na rua as matrículas são pequenas/oblíquas: no vídeo de demonstração com carros escapavam matrículas
+# legíveis com 0,59-0,72; nas 64 fotos de Aveiro, de 0,31 a 0,94 eram quase todas matrículas (o resto,
+# chapa de carro) e nenhum sinal. Caras: abaixo de ~0,5 só apareceram janelas. Desfocar a mais não
+# estraga o catálogo; deixar uma cara ou matrícula à vista não pode acontecer.
+EGOBLUR_DIR = ROOT / "weights"
+EGOBLUR_PESOS = (("ego_blur_face_gen2.jit", 0, 0.50),   # (ficheiro, classe, limiar)
+                 ("ego_blur_lp_gen2.jit", 1, 0.35))
+
+
+def _egoblur(path, dev):
+    """Modelo Gen2 (Faster R-CNN do detectron2 em TorchScript) -> função imagem -> (caixas, pontos, classes).
+    O modelo devolve uma classe 'Instances' que o Python não conhece; o invólucro tira só os tensores."""
+    import torch
+    import torchvision  # noqa: F401  (regista o operador torchvision::nms que o modelo usa)
+
+    class Envolve(torch.nn.Module):
+        def __init__(self, m):
+            super().__init__()
+            self.m = m
+
+        def forward(self, x):
+            p = self.m.inference([{"image": x}], None, False)[0]
+            b, s, c = p._pred_boxes, p._scores, p._pred_classes
+            assert b is not None and s is not None and c is not None
+            return b.tensor, s, c
+
+    return torch.jit.script(Envolve(torch.jit.load(str(path), map_location="cpu").to(dev)))
+
+
+class Desfocar:
+    def __init__(self, dev=None, limiar_cara=None, limiar_matricula=None, nms=0.3, escala=1.15, lado=1200):
+        import torch
+        self.torch = torch
+        self.dev = dev or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.modelos = []
+        for (nome, classe, limiar), meu in zip(EGOBLUR_PESOS, (limiar_cara, limiar_matricula)):
+            p = EGOBLUR_DIR / nome
+            if not p.exists():
+                raise FileNotFoundError(
+                    f"Falta {p}. Descarregar os modelos EgoBlur Gen2 em https://www.projectaria.com/tools/egoblur "
+                    f"e pôr os .jit em {EGOBLUR_DIR} (ou usar --sem-desfocar só para testes).")
+            self.modelos.append((_egoblur(p, self.dev), classe, limiar if meu is None else meu))
+        self.nms, self.escala, self.lado = nms, escala, lado
+
+    def caixas(self, bgr):
+        """Imagem BGR (numpy) -> caixas [x0, y0, x1, y1] de caras e matrículas (pixels da imagem)."""
+        import torch.nn.functional as F
+        import torchvision
+        H, W = bgr.shape[:2]
+        x = self.torch.from_numpy(np.ascontiguousarray(np.transpose(bgr, (2, 0, 1)))).to(self.dev)
+        s = self.lado / max(H, W)
+        h, w = int(H * s + 0.5), int(W * s + 0.5)
+        if (h, w) != (H, W):
+            x = F.interpolate(x[None].float(), size=(h, w), mode="bilinear", align_corners=False,
+                              antialias=True).to(self.torch.uint8)[0]
+        escala = self.torch.tensor([W / w, H / h, W / w, H / h], device=self.dev)
+        out = []
+        with self.torch.no_grad():
+            for modelo, classe, limiar in self.modelos:
+                boxes, scores, classes = modelo(x)
+                boxes, scores = boxes[classes == classe] * escala, scores[classes == classe]
+                if not len(boxes):
+                    continue
+                keep = torchvision.ops.nms(boxes, scores, self.nms)
+                boxes, scores = boxes[keep].cpu().numpy(), scores[keep].cpu().numpy()
+                out += boxes[scores > limiar].tolist()
+        return out
+
+    def __call__(self, bgr):
+        """-> (imagem desfocada, n.º de zonas desfocadas)."""
+        H, W = bgr.shape[:2]
+        bs = self.caixas(bgr)
+        if not bs:
+            return bgr, 0
+        fg = bgr.copy()
+        mask = np.zeros((H, W), np.uint8)
+        for x0, y0, x1, y1 in bs:
+            w, h = (x1 - x0) * self.escala, (y1 - y0) * self.escala
+            xc, yc = (x0 + x1) / 2, (y0 + y1) / 2
+            a, b = int(max(0, xc - w / 2)), int(max(0, yc - h / 2))
+            c, d = int(min(W, xc + w / 2)), int(min(H, yc + h / 2))
+            if c <= a or d <= b:
+                continue
+            fg[b:d, a:c] = cv2.blur(fg[b:d, a:c], (max(1, H // 2), max(1, W // 2)))
+            cv2.ellipse(mask, ((a + c) // 2, (b + d) // 2), ((c - a) // 2, (d - b) // 2), 0, 0, 360, 255, -1)
+        m = mask[..., None] > 0
+        return np.where(m, fg, bgr), len(bs)

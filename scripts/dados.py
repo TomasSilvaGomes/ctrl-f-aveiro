@@ -7,6 +7,8 @@ Tudo o que DESCARREGA dados (Mapillary, OpenStreetMap, modelos). Um comando por 
   referencias  pontos Mapillary/OSM e marcações nas fotos — SÓ para medir, nunca no catálogo
   poses        rotação real da câmara e pontos 3D da Mapillary (meta/poses.csv, sfm/<id>.npz)
   modelos      descarrega os modelos de IA para a cache (uma vez, numa instalação nova)
+  video        vídeo gravado na rua + trilho GPX -> uma foto a cada N metros (como a Mapillary)
+  fotos        fotos tiradas com o telemóvel (GPS e bússola no EXIF) -> formato das amostras
 
 Uso:
     python scripts/dados.py amostra indice
@@ -16,6 +18,8 @@ Uso:
     python scripts/dados.py referencias
     python scripts/dados.py poses
     python scripts/dados.py modelos
+    python scripts/dados.py video gravacao.mp4 --gpx trilho.gpx --saida data/video_rua
+    python scripts/dados.py fotos C:\pasta_das_fotos --saida data/fotos_rua
     python scripts/dados.py <comando> -h      # opções de cada comando
 """
 
@@ -401,11 +405,11 @@ def dms(v):
     return ((d, 1), (m, 1), (s.numerator, s.denominator))
 
 
-def write_exif(path, meta):
+def write_exif(path, meta, fonte="Mapillary", licenca="CC BY-SA 4.0"):
     import piexif  # MIT
     lat, lon = float(meta["lat"]), float(meta["lon"])
     ang = Fraction(float(meta["compass_angle"] or 0) % 360).limit_denominator(100)
-    attribution = f"Mapillary / {meta['creator_username']} (CC BY-SA 4.0) - ID: {meta['id']}"
+    attribution = f"{fonte} / {meta['creator_username']} ({licenca}) - ID: {meta['id']}"
     exif = {
         "0th": {piexif.ImageIFD.Artist: (meta["creator_username"] or "?").encode("utf-8"),
                 piexif.ImageIFD.Copyright: attribution.encode("utf-8")},
@@ -480,14 +484,24 @@ def by_street(args, out):
             if -20 <= t <= args.comprimento and d <= args.largura:
                 seqs[r["sequence_id"]].append((t, r))
     rows = []
-    print(f"{'sequência':<24}{'fotos':>6}{'espaço':>9}  data")
-    for s, v in sorted(seqs.items(), key=lambda kv: -len(kv[1])):
+    escolhidas = []
+    for s, v in seqs.items():
         if len(v) < args.min_fotos:
             continue
+        por_hora = sorted(v, key=lambda z: int(z[1]["captured_at"] or 0))
+        avanca = por_hora[-1][0] - por_hora[0][0]           # > 0: anda do início para a direção
+        if args.sentido and avanca <= 0:
+            continue
+        escolhidas.append((max(t for t, _ in v) - min(t for t, _ in v), len(v), s, v))
+    escolhidas.sort(reverse=True)                            # as que cobrem mais rua primeiro
+    if args.passagens:
+        escolhidas = escolhidas[: args.passagens]
+    print(f"{'sequência':<24}{'fotos':>6}{'cobre':>8}{'espaço':>9}  data")
+    for span, _, s, v in escolhidas:
         v.sort(key=lambda z: z[0])
         gaps = sorted(q - p for (p, _), (q, _) in zip(v, v[1:]))
         date = datetime.fromtimestamp(int(v[0][1]["captured_at"]) / 1000, timezone.utc).date()
-        print(f"{s:<24}{len(v):>6}{gaps[len(gaps) // 2]:>7.1f} m  {date}")
+        print(f"{s:<24}{len(v):>6}{span:>6.0f} m{gaps[len(gaps) // 2] if gaps else 0:>7.1f} m  {date}")
         rows += [{"id": r["id"], "sequence_id": s, "ao_longo_m": round(t, 1), "is_pano": r["is_pano"]} for t, r in v]
     if not rows:
         sys.exit("Nenhuma sequência encontrada nesta rua.")
@@ -523,6 +537,10 @@ def main_sequencia(argv=None):
     g.add_argument("--largura", type=float, default=12, help="distância máxima ao eixo (m)")
     g.add_argument("--min-fotos", type=int, default=30, help="sequências com menos fotos ficam de fora")
     g.add_argument("--so-selecionar", action="store_true", help="só escreve meta/rua_ids.csv (não descarrega)")
+    g.add_argument("--sentido", action="store_true",
+                   help="só passagens que andam do --inicio para o --direcao (um único sentido)")
+    g.add_argument("--passagens", type=int, default=0,
+                   help="fica só com as N passagens que cobrem mais rua (0 = todas)")
     ap.add_argument("--tipo", choices=["360", "frontal", "qualquer"], default="360")
     ap.add_argument("--size", choices=["1024", "2048", "original"], default="original")
     ap.add_argument("--saida", default=str(MAIN_DATA / "piloto_sequencia"))
@@ -859,17 +877,26 @@ def process_cluster(url, items):
     """items: [(meta, rotation)] das fotos desta passagem -> nº de fotos com pontos guardados.
     Corre num processo à parte (com threads o numpy/zlib chegou a rebentar no Windows)."""
     rec = json.loads(zlib.decompress(session().get(url, timeout=120).content))[0]
-    ref = rec["reference_lla"]
-    pts = np.array([p["coordinates"] for p in rec["points"].values()], float)
     shots = rec["shots"]
     keys = list(shots)
     rots = np.array([shots[k]["rotation"] for k in keys], float)
-    done = 0
+    pares = []
     for meta, rot in items:
         j = int(np.argmin(np.linalg.norm(rots - np.asarray(rot), axis=1)))
-        if np.linalg.norm(rots[j] - rot) > 1e-3:
-            continue
-        shot = shots[keys[j]]
+        if np.linalg.norm(rots[j] - rot) <= 1e-3:
+            pares.append((meta, shots[keys[j]]))
+    return guardar_pontos(rec, pares)
+
+
+def guardar_pontos(rec, pares):
+    """Reconstrução OpenSfM (da Mapillary ou nossa) + [(meta, shot)] -> sfm/<id>.npz por foto.
+    Devolve o nº de fotos com pontos guardados."""
+    ref = rec["reference_lla"]
+    pts = np.array([p["coordinates"] for p in rec["points"].values()], float)
+    if not len(pts):
+        return 0
+    done = 0
+    for meta, shot in pares:
         R = rodrigues(shot["rotation"])
         t = np.asarray(shot["translation"], float)
         C = -R.T @ t                                     # centro da câmara (ENU da passagem)
@@ -893,12 +920,119 @@ def process_cluster(url, items):
     return done
 
 
+# --opensfm: as NOSSAS fotos (vídeo, ou uma rua nova) não têm reconstrução da Mapillary. Corre o
+# OpenSfM original (BSD-2, Mapillary) em Docker sobre as fotos de DATA_DIR e grava o mesmo
+# meta/poses.csv + sfm/<id>.npz; troca também lon/lat/rumo da câmara pelos reconstruídos (o GPS
+# fica em lon_gps/lat_gps), como a Mapillary faz. Nada vem da API: a rua fica só com dados nossos.
+# O Docker só LÊ a pasta de dados (o Controlled Folder Access bloqueia escritas em Documentos);
+# o resultado sai pelo stdout e é o Python que o grava em DATA_DIR/opensfm/reconstruction.json.
+# Imagem Docker (uma vez, com o Docker Desktop ligado):
+#     git clone --recurse-submodules https://github.com/mapillary/OpenSfM
+#     docker build -f OpenSfM/Dockerfile.ubuntu24 -t opensfm:ctrlf OpenSfM
+#
+#     $env:DATA_DIR = "data\\video_rua"; python scripts/dados.py poses --opensfm
+
+OPENSFM_PASSOS = ("extract_metadata", "detect_features", "match_features", "create_tracks", "reconstruct")
+
+
+def correr_opensfm(metas, imagem, processos, dop):
+    """Fotos de DATA_DIR -> lista de reconstruções OpenSfM (reconstruction.json)."""
+    import subprocess
+    ds = DATA_DIR / "opensfm"
+    ds.mkdir(parents=True, exist_ok=True)
+    m0 = metas[0]
+    W, H = int(m0["thumb_w"]), int(m0["thumb_h"])
+    if m0["is_pano"] == "True":
+        cam = {"projection_type": "spherical", "width": W, "height": H}
+    else:
+        cp = json.loads(m0["camera_parameters"] or "[]")       # [focal, k1, k2] (focal / lado maior)
+        f, k1, k2 = (cp + [0.85, 0.0, 0.0][len(cp):])[:3]
+        cam = {"projection_type": "perspective", "width": W, "height": H, "focal": f, "k1": k1, "k2": k2}
+    gps = lambda m, k: float(m.get(f"{k}_gps") or m[k])  # noqa: E731
+    exif = {m["file"]: {"gps": {"latitude": gps(m, "lat"), "longitude": gps(m, "lon"), "altitude": 0.0, "dop": dop},
+                        "capture_time": int(m["captured_at"]) / 1000} for m in metas}
+    (ds / "exif_overrides.json").write_text(json.dumps(exif), encoding="utf-8")
+    (ds / "camera_models_overrides.json").write_text(json.dumps({"all": cam}), encoding="utf-8")
+    (ds / "image_list.txt").write_text("".join(f"/in/images/{m['file']}\n" for m in metas), encoding="utf-8")
+    (ds / "config.yaml").write_text(
+        f"processes: {processos}\nuse_altitude_tag: false\nmatching_gps_neighbors: 10\n"
+        "matching_order_neighbors: 10\nfeature_process_size: 2048\n", encoding="utf-8")
+    passos = " ".join(OPENSFM_PASSOS)
+    script = ("mkdir -p /ds && cp /in/cfg/config.yaml /in/cfg/exif_overrides.json /in/cfg/camera_models_overrides.json "
+              "/in/cfg/image_list.txt /ds/ && "
+              f"for s in {passos}; do echo \"  OpenSfM: $s\" >&2; "
+              "python bin/opensfm_main.py $s /ds > /ds/log.txt 2>&1 || { tail -20 /ds/log.txt >&2; exit 1; }; done && "
+              "cat /ds/reconstruction.json")
+    cmd = ["docker", "run", "--rm",
+           "--mount", f"type=bind,source={(DATA_DIR / 'images').resolve()},target=/in/images,readonly",
+           "--mount", f"type=bind,source={ds.resolve()},target=/in/cfg,readonly",
+           imagem, "bash", "-c", script]
+    r = subprocess.run(cmd, stdout=subprocess.PIPE, text=True, encoding="utf-8")
+    if r.returncode != 0 or not r.stdout.strip():
+        sys.exit(f"OpenSfM falhou (código {r.returncode}). A imagem Docker '{imagem}' existe e o Docker está ligado?")
+    (ds / "reconstruction.json").write_text(r.stdout, encoding="utf-8")
+    return json.loads(r.stdout)
+
+
+def main_poses_opensfm(args):
+    t0 = time.time()
+    with open(DATA_DIR / "meta" / "sample_images.csv", encoding="utf-8") as f:
+        linhas = list(csv.DictReader(f))
+    print(f"OpenSfM ({args.imagem}) em {len(linhas)} fotos de {DATA_DIR}", flush=True)
+    recs = correr_opensfm(linhas, args.imagem, args.processos_sfm, args.dop)
+    por_ficheiro = {m["file"]: m for m in linhas}
+    (DATA_DIR / "sfm").mkdir(parents=True, exist_ok=True)
+    poses, desvios, n_img = {}, [], 0
+    for ci, rec in enumerate(recs):
+        ref = rec["reference_lla"]
+        kx = 111320 * math.cos(math.radians(ref["latitude"]))
+        pares = []
+        for nome, shot in rec["shots"].items():
+            meta = por_ficheiro.get(nome)
+            if meta is None:
+                continue
+            pares.append((meta, shot))
+            poses[meta["id"]] = (shot["rotation"], f"opensfm_{ci}")
+            R = rodrigues(shot["rotation"])
+            C = -R.T @ np.asarray(shot["translation"], float)
+            fwd = R.T @ np.array([0.0, 0.0, 1.0])            # eixo da câmara no mundo (E, N, U)
+            if not meta.get("lon_gps"):
+                meta["lon_gps"], meta["lat_gps"] = meta["lon"], meta["lat"]
+            lon, lat = ref["longitude"] + C[0] / kx, ref["latitude"] + C[1] / 110540
+            desvios.append(math.hypot((lon - float(meta["lon_gps"])) * kx, (lat - float(meta["lat_gps"])) * 110540))
+            meta["lon"], meta["lat"] = round(lon, 8), round(lat, 8)
+            meta["compass_angle"] = round(math.degrees(math.atan2(fwd[0], fwd[1])) % 360, 2)
+        n_img += guardar_pontos(rec, pares)
+    with open(DATA_DIR / "meta" / "poses.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["id", "rotation", "cluster"])
+        for m in linhas:
+            rot, cl = poses.get(m["id"], (None, ""))
+            w.writerow([m["id"], json.dumps(rot) if rot else "", cl])
+    with open(DATA_DIR / "meta" / "sample_images.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=list(linhas[0].keys()))
+        w.writeheader()
+        w.writerows(linhas)
+    n_pts = sum(len(r["points"]) for r in recs)
+    print(f"Reconstruídas {len(poses)}/{len(linhas)} fotos em {len(recs)} reconstrução(ões), {n_pts:,} pontos 3D "
+          f"({time.time() - t0:.0f} s)\n  -> meta/poses.csv (rotação) · sfm/: {n_img} fotos com pontos · "
+          f"posição da câmara: desvio mediano ao GPS {statistics.median(desvios) if desvios else 0:.1f} m "
+          f"(o GPS fica em lon_gps/lat_gps)")
+
+
 def main_poses(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--workers", type=int, default=12)
     ap.add_argument("--processos", type=int, default=6, help="processos para a parte 3D")
     ap.add_argument("--sem-3d", action="store_true", help="só as rotações (rápido)")
+    ap.add_argument("--opensfm", action="store_true",
+                    help="fotos NOSSAS: reconstrução própria com o OpenSfM em Docker (sem API da Mapillary)")
+    ap.add_argument("--imagem", default="opensfm:ctrlf", help="imagem Docker do OpenSfM")
+    ap.add_argument("--processos-sfm", type=int, default=8, help="processos do OpenSfM")
+    ap.add_argument("--dop", type=float, default=5.0, help="erro do GPS em metros (telemóvel ~5)")
     args = ap.parse_args(argv)
+    if args.opensfm:
+        return main_poses_opensfm(args)
     tok = token()
     with open(DATA_DIR / "meta" / "sample_images.csv", encoding="utf-8") as f:
         metas = {r["id"]: r for r in csv.DictReader(f)}
@@ -957,6 +1091,7 @@ def main_poses(argv=None):
 #   OWLv2   google/owlv2-base-patch16-ensemble   Apache 2.0   encontra objetos
 #   SigLIP  google/siglip-so400m-patch14-384     Apache 2.0   tipo, limites de velocidade, código do sinal
 #   SAM 2   facebook/sam2.1-hiera-large          Apache 2.0   contorno do objeto
+#   EgoBlur Gen2 (Meta, caras + matrículas)      Apache 2.0   download manual (projectaria.com) -> weights/
 #
 # Uso:
 #     python scripts/dados.py modelos
@@ -983,6 +1118,334 @@ def main_modelos(argv=None):
     args = ap.parse_args(argv)
     for nome in args.so:
         descarregar(nome)
+    from comum import EGOBLUR_DIR, EGOBLUR_PESOS
+    faltam = [n for n, _, _ in EGOBLUR_PESOS if not (EGOBLUR_DIR / n).exists()]
+    if faltam:
+        print(f"EgoBlur Gen2 (caras e matrículas): descarregar à mão em https://www.projectaria.com/tools/egoblur "
+              f"(aceitar os termos) e pôr {' e '.join(faltam)} em {EGOBLUR_DIR}")
+
+
+####################################################################################################
+# VIDEO  (novo: vídeo gravado na rua -> sequência de fotos, como a Mapillary faz)
+####################################################################################################
+# Um vídeo + o trilho GPS (ficheiro GPX) -> uma foto a cada --passo metros ao longo do percurso,
+# no mesmo formato das amostras (images/ + meta/sample_images.csv), pronta para a pipeline.
+#
+#   - escolha pela DISTÂNCIA (como o mapillary_tools: 1 foto / 3 m por omissão): com o carro
+#     parado não sai nenhuma foto repetida;
+#   - em cada ponto escolhe a imagem mais NÍTIDA numa janela de --janela segundos;
+#   - posição = GPS interpolado no instante dessa imagem; rumo = sentido do movimento;
+#   - câmara frontal (perspetiva); --focal = distância focal / maior lado da imagem
+#     (telemóvel ~0,8; ação/GoPro linear ~0,6).
+#   - caras e matrículas desfocadas (EgoBlur) ANTES de gravar; o vídeo original não é guardado.
+#
+# Uso:
+#     python scripts/dados.py video gravacao.mp4 --gpx trilho.gpx --saida data/video_rua
+#     python scripts/dados.py video gravacao.mp4 --gpx trilho.gpx --saida data/video_rua --passo 4 --desvio-s 1.5
+
+
+def read_gpx(path):
+    """GPX -> lista ordenada de (t_epoch_s, lat, lon)."""
+    import xml.etree.ElementTree as ET
+    pts = []
+    for el in ET.parse(path).getroot().iter():
+        if el.tag.endswith("trkpt") or el.tag.endswith("wpt"):
+            tt = next((c.text for c in el if c.tag.endswith("time")), None)
+            if tt:
+                ts = datetime.fromisoformat(tt.replace("Z", "+00:00")).timestamp()
+                pts.append((ts, float(el.get("lat")), float(el.get("lon"))))
+    pts.sort()
+    if len(pts) < 2:
+        sys.exit(f"O GPX {path} não tem pontos com hora.")
+    return pts
+
+
+def data_do_video(path):
+    """Hora (epoch UTC) em que o vídeo começou, lida pelo ffprobe: no iPhone a etiqueta
+    com.apple.quicktime.creationdate (hora local + fuso); senão creation_time (UTC). None se não houver."""
+    import re
+    import subprocess
+    exe = shutil.which("ffprobe")
+    if not exe:
+        return None
+    r = subprocess.run([exe, "-v", "error", "-show_entries", "format_tags:stream_tags", "-of", "json", str(path)],
+                       capture_output=True, text=True, encoding="utf-8")
+    try:
+        js = json.loads(r.stdout or "{}")
+    except json.JSONDecodeError:
+        return None
+    tags = dict(js.get("format", {}).get("tags", {}))
+    for s in js.get("streams", []):
+        for k, v in s.get("tags", {}).items():
+            tags.setdefault(k, v)
+    for k in ("com.apple.quicktime.creationdate", "creation_time"):
+        v = tags.get(k)
+        if v:
+            v = re.sub(r"([+-]\d\d)(\d\d)$", r"\1:\2", v.strip().replace("Z", "+00:00"))
+            try:
+                d = datetime.fromisoformat(v)
+            except ValueError:
+                continue
+            return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).timestamp()
+    return None
+
+
+def main_video(argv=None):
+    import cv2
+    ap = argparse.ArgumentParser(description="vídeo + GPX -> fotos a cada N metros (formato das amostras)")
+    ap.add_argument("video")
+    ap.add_argument("--gpx", required=True, help="trilho GPS com hora (GoPro/telemóvel -> GPX)")
+    ap.add_argument("--saida", required=True, help="pasta de dados nova (ex.: data/video_rua)")
+    ap.add_argument("--passo", type=float, default=4.0, help="metros entre fotos (Mapillary: 3)")
+    ap.add_argument("--janela", type=float, default=0.4, help="segundos à volta de cada ponto para escolher a mais nítida")
+    ap.add_argument("--desvio-s", type=float, default=None,
+                    help="à mão: o vídeo começa N s depois do 1.º ponto do GPX (por omissão: data gravada no vídeo)")
+    ap.add_argument("--focal", type=float, default=0.8, help="distância focal / maior lado da imagem")
+    ap.add_argument("--largura", type=int, default=1920, help="largura das fotos guardadas (px)")
+    ap.add_argument("--autor", default="equipa")
+    ap.add_argument("--licenca", default="CC BY-SA 4.0")
+    ap.add_argument("--sem-desfocar", action="store_true",
+                    help="SÓ PARA TESTES com fotos já desfocadas (ex.: da Mapillary)")
+    args = ap.parse_args(argv)
+    t0 = time.time()
+    from comum import Desfocar
+    try:
+        desfocar = None if args.sem_desfocar else Desfocar()
+    except FileNotFoundError as e:
+        sys.exit(str(e))
+
+    gpx = read_gpx(args.gpx)
+    ts = np.array([g[0] for g in gpx])
+    lat = np.array([g[1] for g in gpx])
+    lon = np.array([g[2] for g in gpx])
+    kx, ky = 111320 * math.cos(math.radians(lat.mean())), 110540
+    step = np.hypot(np.diff(lon) * kx, np.diff(lat) * ky)
+    dist = np.concatenate([[0], np.cumsum(step)])          # metros percorridos em cada ponto GPS
+
+    cap = cv2.VideoCapture(args.video)
+    if not cap.isOpened():
+        sys.exit(f"Não consegui abrir {args.video}")
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30
+    n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    dur = n_frames / fps
+    if args.desvio_s is not None:
+        start, como = ts[0] + args.desvio_s, f"--desvio-s {args.desvio_s:g}"
+    else:
+        start = data_do_video(args.video)                    # hora (UTC) do 1.º frame do vídeo
+        if start is None:
+            sys.exit("O vídeo não tem data de gravação (foi enviado por mensagem?). Usar o ficheiro original "
+                     "ou dizer à mão quando começou: --desvio-s <segundos depois do início do GPX>")
+        como = "data gravada no vídeo"
+    hm = lambda t: datetime.fromtimestamp(t).strftime("%H:%M:%S")  # noqa: E731
+    print(f"Vídeo {hm(start)}–{hm(start + dur)} ({como}) · GPX {hm(ts[0])}–{hm(ts[-1])}", flush=True)
+    if start < ts[0] - 1 or start + dur > ts[-1] + 1:
+        fora = max(ts[0] - start, start + dur - ts[-1])
+        if fora > dur / 2:
+            sys.exit("O vídeo não está dentro do trilho GPX (horas não batem certo). O GPX tem de começar antes "
+                     "do vídeo e acabar depois; ou dizer à mão --desvio-s.")
+        print(f"  aviso: {fora:.0f} s do vídeo ficam fora do GPX (sem posição): o GPX deve começar antes e "
+              f"acabar depois do vídeo", flush=True)
+    # pontos-alvo: a cada --passo metros, dentro do troço que o vídeo cobre
+    d_ini = np.interp(start, ts, dist)
+    d_fim = np.interp(start + dur, ts, dist)
+    alvos_d = np.arange(d_ini, d_fim, args.passo)
+    # instante em que se passa em cada ponto (1.ª vez: parado não conta)
+    alvos_t = np.interp(alvos_d, dist, ts) - start
+    janelas = [(max(0, int((a - args.janela) * fps)), int((a + args.janela) * fps)) for a in alvos_t]
+    print(f"Vídeo {dur:.0f} s a {fps:.0f} fps · percurso {d_fim - d_ini:.0f} m · {len(janelas)} pontos a cada {args.passo:g} m",
+          flush=True)
+
+    out = Path(args.saida)
+    (out / "images").mkdir(parents=True, exist_ok=True)
+    (out / "meta").mkdir(parents=True, exist_ok=True)
+    stem = "".join(c if c.isalnum() else "_" for c in Path(args.video).stem)
+    best = {}            # n.º do ponto -> (nitidez, frame, imagem)
+    j, f_idx = 0, -1
+    while j < len(janelas):
+        if not cap.grab():
+            break
+        f_idx += 1
+        while j < len(janelas) and f_idx > janelas[j][1]:
+            j += 1
+        for k in range(j, min(j + 3, len(janelas))):    # janelas próximas podem sobrepor-se
+            a, b = janelas[k]
+            if a <= f_idx <= b:
+                ok, im = cap.retrieve()
+                if not ok:
+                    continue
+                g = cv2.cvtColor(cv2.resize(im, (480, int(480 * im.shape[0] / im.shape[1]))), cv2.COLOR_BGR2GRAY)
+                sharp = cv2.Laplacian(g, cv2.CV_64F).var()
+                if k not in best or sharp > best[k][0]:
+                    best[k] = (sharp, f_idx, im)
+    cap.release()
+
+    metas, usados, n_blur = [], set(), 0
+    for k in sorted(best):
+        _, f_idx, im = best[k]
+        if f_idx in usados:          # dois pontos com a mesma imagem (vídeo lento): fica uma
+            continue
+        usados.add(f_idx)
+        tg = start + f_idx / fps     # hora GPS desta imagem
+        la, lo = float(np.interp(tg, ts, lat)), float(np.interp(tg, ts, lon))
+        da = np.interp(tg, ts, dist)  # rumo = direção entre 5 m antes e 5 m depois
+        a_lat, a_lon = np.interp(np.interp(da - 5, dist, ts), ts, lat), np.interp(np.interp(da - 5, dist, ts), ts, lon)
+        b_lat, b_lon = np.interp(np.interp(da + 5, dist, ts), ts, lat), np.interp(np.interp(da + 5, dist, ts), ts, lon)
+        rumo = math.degrees(math.atan2((b_lon - a_lon) * kx, (b_lat - a_lat) * ky)) % 360
+        h, w = im.shape[:2]
+        if w > args.largura:
+            im = cv2.resize(im, (args.largura, round(h * args.largura / w)), interpolation=cv2.INTER_AREA)
+            h, w = im.shape[:2]
+        if desfocar:
+            im, nb = desfocar(im)
+            n_blur += nb
+        iid = f"{stem}_{f_idx:06d}"
+        fn = f"{iid}.jpg"
+        cv2.imwrite(str(out / "images" / fn), im, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        meta = {"id": iid, "file": fn, "thumb_w": w, "thumb_h": h, "width": w, "height": h,
+                "lon": round(lo, 8), "lat": round(la, 8), "lon_gps": round(lo, 8), "lat_gps": round(la, 8),
+                "compass_angle": round(rumo, 2), "camera_type": "perspective",
+                "camera_parameters": json.dumps([args.focal, 0.0, 0.0]), "is_pano": "False",
+                "captured_at": int(tg * 1000), "sequence": stem, "creator_username": args.autor,
+                "creator_id": "", "license": args.licenca, "source_url": "", "atribuicao": ""}
+        meta["atribuicao"] = write_exif(out / "images" / fn, meta, fonte="Vídeo", licenca=args.licenca)
+        metas.append(meta)
+
+    with open(out / "meta" / "sample_images.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=list(metas[0].keys()))
+        w.writeheader()
+        w.writerows(metas)
+    for name in ("osm_aveiro.geojson", "mapillary_features_aveiro.geojson"):   # só para medir
+        src = ROOT / "data" / "ground_truth" / name
+        if src.exists():
+            (out / "ground_truth").mkdir(exist_ok=True)
+            shutil.copyfile(src, out / "ground_truth" / name)
+    print(f"{len(metas)} fotos ({time.time() - t0:.0f} s) · "
+          + (f"{n_blur} caras/matrículas desfocadas" if desfocar else "SEM desfocagem (teste)") + f" -> {out}")
+    print(f"A seguir: python scripts/pipeline.py --dados {out} --triangulacao --imagens 6")
+
+
+####################################################################################################
+# FOTOS  (fotos tiradas com o telemóvel, sem instalar nada)
+####################################################################################################
+# O vídeo da app Câmara do iPhone só guarda UM ponto GPS (o do início); cada FOTO guarda GPS,
+# direção da bússola (GPSImgDirection), hora e distância focal. Uma pasta de fotos tiradas ao longo
+# da rua (a pé, uma a cada poucos passos, ou em modo contínuo) -> mesmo formato das amostras.
+#   - JPEG (iPhone: Definições > Câmara > Formatos > "Mais compatível", ou "Transferir para Mac ou
+#     PC: Automático", que converte ao passar por cabo). HEIC não: o leitor traz código GPL.
+#   - fotos ao alto ou deitadas (roda pela orientação EXIF); distância focal pela equivalente 35 mm.
+#   - sem direção da bússola: rumo = sentido do movimento entre fotos seguidas.
+#   - caras e matrículas desfocadas (EgoBlur) ANTES de gravar.
+#
+#     python scripts/dados.py fotos C:\pasta_das_fotos --saida data/fotos_rua
+
+
+def exif_foto(path):
+    """JPEG -> (imagem PIL já rodada, {lat, lon, rumo, t, f35}) a partir do EXIF."""
+    from PIL import Image, ImageOps
+    im = Image.open(path)
+    ex = im.getexif()
+    gps = ex.get_ifd(0x8825) if ex else {}
+    sub = ex.get_ifd(0x8769) if ex else {}
+
+    def graus(v, ref):
+        d = float(v[0]) + float(v[1]) / 60 + float(v[2]) / 3600
+        return -d if ref in ("S", "W", b"S", b"W") else d
+    info = {"lat": None, "lon": None, "rumo": None, "t": None, "f35": None}
+    if gps.get(2) and gps.get(4):
+        info["lat"], info["lon"] = graus(gps[2], gps.get(1, "N")), graus(gps[4], gps.get(3, "E"))
+    if gps.get(17) is not None:
+        info["rumo"] = float(gps[17]) % 360
+    data = sub.get(0x9003) or ex.get(0x0132)                 # DateTimeOriginal / DateTime
+    if data:
+        fuso = sub.get(0x9011) or "+00:00"                   # OffsetTimeOriginal
+        try:
+            info["t"] = datetime.strptime(f"{data} {fuso}", "%Y:%m:%d %H:%M:%S %z").timestamp()
+        except ValueError:
+            pass
+    if sub.get(0xA405):
+        info["f35"] = float(sub[0xA405])                      # FocalLengthIn35mmFilm
+    return ImageOps.exif_transpose(im).convert("RGB"), info
+
+
+def main_fotos(argv=None):
+    import cv2
+    ap = argparse.ArgumentParser(description="pasta de fotos do telemóvel (com GPS no EXIF) -> formato das amostras")
+    ap.add_argument("pasta")
+    ap.add_argument("--saida", required=True, help="pasta de dados nova (ex.: data/fotos_rua)")
+    ap.add_argument("--largura", type=int, default=1920, help="lado maior das fotos guardadas (px)")
+    ap.add_argument("--autor", default="equipa")
+    ap.add_argument("--licenca", default="CC BY-SA 4.0")
+    ap.add_argument("--sem-desfocar", action="store_true", help="SÓ PARA TESTES com fotos já desfocadas")
+    args = ap.parse_args(argv)
+    t0 = time.time()
+    fs = sorted(p for p in Path(args.pasta).iterdir() if p.suffix.lower() in (".jpg", ".jpeg"))
+    heic = [p for p in Path(args.pasta).iterdir() if p.suffix.lower() in (".heic", ".heif")]
+    if heic:
+        print(f"  aviso: {len(heic)} fotos HEIC ignoradas (passar em JPEG: iPhone > Câmara > Formatos > Mais compatível)")
+    if not fs:
+        sys.exit("Nenhuma foto JPEG na pasta.")
+    from comum import Desfocar
+    try:
+        desfocar = None if args.sem_desfocar else Desfocar()
+    except FileNotFoundError as e:
+        sys.exit(str(e))
+    lidas, sem_gps = [], []
+    for p in fs:
+        im, info = exif_foto(p)
+        (lidas if info["lat"] is not None else sem_gps).append((p, im, info))
+    if sem_gps:
+        print(f"  aviso: {len(sem_gps)} fotos sem GPS ignoradas (iPhone: Definições > Privacidade > "
+              f"Serviços de localização > Câmara = Durante a utilização): {', '.join(p.name for p, _, _ in sem_gps[:5])}")
+    if not lidas:
+        sys.exit("Nenhuma foto com GPS no EXIF (o chat/WhatsApp tiram-no: usar os ficheiros originais).")
+    lidas.sort(key=lambda z: (z[2]["t"] or 0, z[0].name))
+    out = Path(args.saida)
+    (out / "images").mkdir(parents=True, exist_ok=True)
+    (out / "meta").mkdir(parents=True, exist_ok=True)
+    seq = "".join(c if c.isalnum() else "_" for c in Path(args.pasta).name)
+    kx = 111320 * math.cos(math.radians(lidas[0][2]["lat"]))
+    metas, n_blur, n_rumo = [], 0, 0
+    for k, (p, im, info) in enumerate(lidas):
+        rumo = info["rumo"]
+        if rumo is None:                                     # sem bússola: sentido do movimento
+            a = lidas[max(0, k - 1)][2]
+            b = lidas[min(len(lidas) - 1, k + 1)][2]
+            rumo = math.degrees(math.atan2((b["lon"] - a["lon"]) * kx, (b["lat"] - a["lat"]) * 110540)) % 360
+            n_rumo += 1
+        im.thumbnail((args.largura, args.largura))
+        bgr = cv2.cvtColor(np.asarray(im), cv2.COLOR_RGB2BGR)
+        if desfocar:
+            bgr, nb = desfocar(bgr)
+            n_blur += nb
+        h, w = bgr.shape[:2]
+        iid = f"{seq}_{k:04d}"
+        fn = f"{iid}.jpg"
+        cv2.imwrite(str(out / "images" / fn), bgr, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        # distância focal / lado maior: equivalente 35 mm é sobre a diagonal (43,27 mm)
+        focal = info["f35"] / 43.27 * math.hypot(w, h) / max(w, h) if info["f35"] else 0.8
+        meta = {"id": iid, "file": fn, "thumb_w": w, "thumb_h": h, "width": w, "height": h,
+                "lon": round(info["lon"], 8), "lat": round(info["lat"], 8),
+                "lon_gps": round(info["lon"], 8), "lat_gps": round(info["lat"], 8),
+                "compass_angle": round(rumo, 2), "camera_type": "perspective",
+                "camera_parameters": json.dumps([round(focal, 4), 0.0, 0.0]), "is_pano": "False",
+                "captured_at": int((info["t"] or 0) * 1000), "sequence": seq, "creator_username": args.autor,
+                "creator_id": "", "license": args.licenca, "source_url": "", "atribuicao": ""}
+        meta["atribuicao"] = write_exif(out / "images" / fn, meta, fonte="Fotos", licenca=args.licenca)
+        metas.append(meta)
+    with open(out / "meta" / "sample_images.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=list(metas[0].keys()))
+        w.writeheader()
+        w.writerows(metas)
+    for name in ("osm_aveiro.geojson", "mapillary_features_aveiro.geojson"):   # só para medir
+        src = ROOT / "data" / "ground_truth" / name
+        if src.exists():
+            (out / "ground_truth").mkdir(exist_ok=True)
+            shutil.copyfile(src, out / "ground_truth" / name)
+    passo = [math.hypot((b["lon"] - a["lon"]) * kx, (b["lat"] - a["lat"]) * 110540) for a, b in zip(metas, metas[1:])]
+    print(f"{len(metas)} fotos ({time.time() - t0:.0f} s) · uma a cada {statistics.median(passo) if passo else 0:.1f} m · "
+          f"rumo pela bússola em {len(metas) - n_rumo}, pelo movimento em {n_rumo} · "
+          + (f"{n_blur} caras/matrículas desfocadas" if desfocar else "SEM desfocagem (teste)") + f" -> {out}")
+    print(f"A seguir: python scripts/pipeline.py --dados {out} --triangulacao --altura-camara 1.4")
 
 
 ####################################################################################################
@@ -992,6 +1455,8 @@ SECOES = {
     "referencias": (main_referencias, "pontos Mapillary/OSM só para medir"),
     "poses": (main_poses, "rotação da câmara e pontos 3D"),
     "modelos": (main_modelos, "descarrega os modelos de IA"),
+    "video": (main_video, "vídeo + GPX -> fotos a cada N metros"),
+    "fotos": (main_fotos, "fotos do telemóvel (GPS no EXIF) -> formato das amostras"),
 }
 
 

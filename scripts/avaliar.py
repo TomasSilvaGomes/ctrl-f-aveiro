@@ -1104,7 +1104,7 @@ def main_prompts(argv=None):
     p.add_argument("--limite", type=int, default=0)
     p = sub.add_parser("auditar", help="verificação a olho do tipo (preparar / medir)")
     p.add_argument("modo", choices=["preparar", "medir"])
-    p.add_argument("--pastas", nargs="+", default=["data/piloto_rua", "data/piloto_sequencia"])
+    p.add_argument("--pastas", nargs="+", required=True, help="pastas de dados a auditar (ex.: data data/piloto_rua)")
     p.add_argument("--n", type=int, default=40)
     p.add_argument("--seed", type=int, default=0)
     args = ap.parse_args(argv)

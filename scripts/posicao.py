@@ -58,7 +58,8 @@ from comum import DATA_DIR, limiares, limit_vram, perspective_view  # noqa: E402
 #     python scripts/posicao.py contorno --categorias iluminacao
 
 
-MODEL = "facebook/sam2.1-hiera-large"   # Apache 2.0
+SAM_MODELOS = {t: f"facebook/sam2.1-hiera-{t}" for t in ("large", "base-plus", "small", "tiny")}   # Apache 2.0
+MODEL = SAM_MODELOS["large"]
 SIZE = 1024
 Image.MAX_IMAGE_PIXELS = None
 
@@ -81,11 +82,11 @@ def view_to_pano_v(yv, xv, H, f):
 
 
 class Sam:
-    def __init__(self, dev):
+    def __init__(self, dev, model=MODEL):
         from transformers import Sam2Model, Sam2Processor
         limit_vram()
-        self.proc = Sam2Processor.from_pretrained(MODEL)
-        self.model = Sam2Model.from_pretrained(MODEL).to(dev).eval()
+        self.proc = Sam2Processor.from_pretrained(model)
+        self.model = Sam2Model.from_pretrained(model).to(dev).eval()
         self.dev = dev
 
     @torch.inference_mode()
@@ -95,6 +96,48 @@ class Sam:
         out = self.model(**inp, multimask_output=False)
         masks = self.proc.post_process_masks(out.pred_masks.cpu(), inp["original_sizes"])[0]
         return np.asarray(masks).reshape(-1, *masks.shape[-2:])[0] > 0
+
+
+class Mask2FormerVistas:
+    """Segmentação semântica treinada no Mapillary Vistas (Meta). SÓ PARA COMPARAÇÃO: o Vistas
+    público é não comercial e os pesos têm licença "other" (ver docs/LICENCAS.md).
+    Contorno de um objeto = pedaço das classes certas que mais se sobrepõe à caixa do OWLv2:
+      iluminação  Street Light + Pole + Utility Pole      contentores  Trash Can"""
+    MODEL = "facebook/mask2former-swin-large-mapillary-vistas-semantic"
+    CLASSES = {"iluminacao": ("Street Light", "Pole", "Utility Pole"), "residuos": ("Trash Can",)}
+
+    def __init__(self, dev):
+        from transformers import Mask2FormerForUniversalSegmentation, AutoImageProcessor
+        limit_vram()
+        self.proc = AutoImageProcessor.from_pretrained(self.MODEL)
+        self.model = Mask2FormerForUniversalSegmentation.from_pretrained(self.MODEL).to(dev).eval()
+        if dev == "cuda":
+            self.model = self.model.half()
+        self.dev = dev
+        lab = {v: int(k) for k, v in self.model.config.id2label.items()}
+        self.ids = {c: [lab[n] for n in ns] for c, ns in self.CLASSES.items()}
+        self.categoria = "iluminacao"
+
+    @torch.inference_mode()
+    def __call__(self, img, box):
+        import cv2
+        H, W = img.shape[:2]
+        inp = self.proc(images=Image.fromarray(img), return_tensors="pt").to(self.dev)
+        if self.dev == "cuda":
+            inp["pixel_values"] = inp["pixel_values"].half()
+        out = self.model(**inp)
+        sem = self.proc.post_process_semantic_segmentation(out, target_sizes=[(H, W)])[0].cpu().numpy()
+        m = np.isin(sem, self.ids[self.categoria]).astype(np.uint8)
+        n, lab = cv2.connectedComponents(m)
+        if n <= 1:
+            return np.zeros((H, W), bool)
+        x0, y0, x1, y1 = [int(round(v)) for v in box]
+        inside = lab[max(0, y0):max(0, y1) + 1, max(0, x0):max(0, x1) + 1]
+        cnt = np.bincount(inside.ravel(), minlength=n)
+        cnt[0] = 0
+        if cnt.max() == 0:
+            return np.zeros((H, W), bool)
+        return lab == int(cnt.argmax())
 
 
 def d3_in(mask, px, py, ok, hdist):
@@ -179,10 +222,13 @@ def main_contorno(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", default="owlv2")
     ap.add_argument("--categorias", default="iluminacao,residuos")
+    ap.add_argument("--sam", choices=list(SAM_MODELOS) + ["mask2former"], default="small",
+                    help="SAM 2 small (por omissão desde 19/11; o catálogo principal já foi feito com o large, "
+                         "cache contorno_cache.jsonl) / large / base-plus / tiny, ou mask2former (só comparação)")
     args = ap.parse_args(argv)
     cats = set(args.categorias.split(","))
     path = DATA_DIR / "preds" / f"{args.model}_classified.jsonl"
-    cache_path = DATA_DIR / "preds" / "contorno_cache.jsonl"
+    cache_path = DATA_DIR / "preds" / ("contorno_cache.jsonl" if args.sam == "large" else f"contorno_cache_{args.sam}.jsonl")
     dets = [json.loads(ln) for ln in open(path, encoding="utf-8")]
     cache = {}
     if cache_path.exists():
@@ -200,7 +246,8 @@ def main_contorno(argv=None):
     print(f"Contornos: {len(dets)} deteções · já feitos {len(cache)} · a fazer {n_todo} em {len(todo)} fotos", flush=True)
 
     if n_todo:
-        sam = Sam("cuda" if torch.cuda.is_available() else "cpu")
+        dev = "cuda" if torch.cuda.is_available() else "cpu"
+        sam = Mask2FormerVistas(dev) if args.sam == "mask2former" else Sam(dev, SAM_MODELOS[args.sam])
         t0, n = time.time(), 0
         with open(cache_path, "a", encoding="utf-8") as fc:
             for k, (iid, ds) in enumerate(todo.items(), 1):
@@ -217,6 +264,7 @@ def main_contorno(argv=None):
                 for d in ds:
                     poly = []
                     try:
+                        sam.categoria = d["category"]          # (só o Mask2Former usa)
                         base_y, d3, v, mask = segment(sam, d, meta, im, pts, keep=True)
                         if base_y is not None:
                             poly = polygons(mask, v)

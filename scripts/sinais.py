@@ -5,13 +5,11 @@ Detalhes dos SINAIS (passos da pipeline depois de classificar):
   codigo    código e nome oficial do Guia de Sinalização da DGV (perigo -> "Trânsito nos dois
             sentidos", A25 ...), por semelhança com os desenhos do PDF
   extrair   desenhos + códigos dos sinais do PDF da DGV -> data/referencias/sinais/ (uma vez)
-  testar    mede a escolha do código contra as marcações Mapillary (só para medir)
 
 Uso:
     python scripts/sinais.py limites
     python scripts/sinais.py codigo
     python scripts/sinais.py extrair
-    python scripts/sinais.py testar --limite 400
 """
 
 from __future__ import annotations
@@ -21,7 +19,6 @@ import csv
 import json
 import math
 import os
-import random
 import re
 import sys
 import time
@@ -36,7 +33,7 @@ from PIL import Image, ImageFilter
 from tqdm import tqdm
 
 sys.path.insert(0, os.path.dirname(__file__))
-from comum import DATA_DIR, ROOT, load_jsonl, matches  # noqa: E402
+from comum import DATA_DIR, ROOT  # noqa: E402
 
 
 ####################################################################################################
@@ -97,10 +94,16 @@ def flat_print(img, box):
 
 
 class SpeedReader:
-    def __init__(self, device):
-        from transformers import AutoModel, AutoProcessor
-        self.proc = AutoProcessor.from_pretrained(SIGLIP)
-        self.model = AutoModel.from_pretrained(SIGLIP, dtype=torch.float16).to(device).eval()
+    def __init__(self, device, classifier=None):
+        """classifier: um classificar.Classifier já carregado -> reaproveita o mesmo SigLIP (a app
+        carrega o modelo uma só vez)."""
+        if classifier is not None:
+            self.proc, self.model, self.dtype = classifier.proc, classifier.model, classifier.dtype
+        else:
+            from transformers import AutoModel, AutoProcessor
+            self.dtype = torch.float16 if torch.device(device).type == "cuda" else torch.float32
+            self.proc = AutoProcessor.from_pretrained(SIGLIP)
+            self.model = AutoModel.from_pretrained(SIGLIP, dtype=self.dtype).to(device).eval()
         self.device = device
         with torch.inference_mode():
             tok = self.proc(text=[f"This is a photo of a round speed limit traffic sign with the number {n}."
@@ -115,7 +118,7 @@ class SpeedReader:
     @torch.inference_mode()
     def __call__(self, view):
         im = Image.fromarray(view).resize((384, 384), Image.BICUBIC)
-        pv = self.proc(images=im, return_tensors="pt")["pixel_values"].to(self.device).half()
+        pv = self.proc(images=im, return_tensors="pt")["pixel_values"].to(self.device).to(self.dtype)
         e = self._t(self.model.get_image_features(pixel_values=pv))
         p = torch.softmax((e / e.norm(dim=-1, keepdim=True)) @ self.text.T * self.model.logit_scale.exp().float(), -1)[0]
         i = int(p.argmax())
@@ -169,21 +172,14 @@ def main_limites(argv=None):
 # DESENHOS  (antes: scripts/semelhanca_sinais.py)
 ####################################################################################################
 # Código EXATO de cada sinal por semelhança imagem-imagem com os desenhos oficiais
-# (ex.: C11a "Proibição de virar à direita" vs C11b "... à esquerda"). Três comandos:
+# (ex.: C11a "Proibição de virar à direita" vs C11b "... à esquerda"). Dois comandos:
 #
 #   extrair   desenhos dos sinais do Guia de Sinalização Rodoviária (DGV, 2003), com o código e o
 #             nome lidos da legenda (ex.: "A1a – Curva à direita")
 #             pdfs/SinalizacaoRodoviaria.pdf -> data/referencias/sinais/<código>.png + sinais.csv
 #             Uso interno para teste — confirmar com os mentores se os desenhos podem ser usados.
-#   testar    cada recorte da rua -> "impressão digital" -> código do desenho mais parecido.
-#             Banco de referências = desenhos com variações (rodado, perspetiva, desfocado,
-#             pequeno, mais escuro, fundo trocado). Modelos: SigLIP (omissão) ou DINOv2.
-#             Teste a 17/11 (400 sinais): SigLIP 78% · DINOv2 23–38% (estranha desenhos vs fotos).
-#             Pares espelhados (esquerda/direita) detetados automaticamente; nesses pares a escolha
-#             é refeita píxel a píxel ("pixeis") ou por zonas do sinal ("zonas").
-#             Medição: sinais do sistema que a Mapillary também marcou (classe Mapillary -> código
-#             RST, tabela MLY_TO_RST, só para medir) -> data/relatorios/semelhanca_<modelo>.json
-#             Teste a 18/11 (2 325 sinais): código exato 84%.
+#   (o teste de 17–18/11 escolheu o SigLIP: 78–84% de código exato; DINOv2 23–38%. O subcomando
+#   'testar' e o DINOv2 saíram a 19/11.)
 #   codigo    PASSO DA PIPELINE (depois de sinais.py limites): os sinais de tipo genérico (perigo,
 #             obrigação, proibido virar, estacionamento, outro) ganham o código e o nome oficial
 #             do desenho mais parecido DENTRO da família do tipo (ex.: perigo -> só códigos A):
@@ -191,8 +187,6 @@ def main_limites(argv=None):
 #
 # Uso:
 #     python scripts/sinais.py extrair
-#     python scripts/sinais.py testar
-#     python scripts/sinais.py testar --modelo dinov2 --limite 400
 #     python scripts/sinais.py codigo
 
 
@@ -272,75 +266,10 @@ def cmd_extrair(args):
     print("Por família: " + ", ".join(f"{k}: {v}" for k, v in Counter(r["familia"] for r in rows).items()))
 
 
-# ================================================================== testar (semelhança)
-MODELOS = {"siglip": "google/siglip-so400m-patch14-384",  # Apache 2.0
-           "dinov2": "facebook/dinov2-base"}                # Apache 2.0
+# ================================================================== semelhança com os desenhos
+MODELOS = {"siglip": "google/siglip-so400m-patch14-384"}  # Apache 2.0
 FAMILIAS_RUA = ("A", "B", "C", "D", "E", "G", "H")  # sinais verticais
 REF_INNER, CROP_INNER = 0.8, 0.8 / 1.4  # interior do sinal (o recorte da rua tem margem 1,4)
-METODOS = ("modelo", "+pixeis", "+zonas", "+pixeis_se_duvida")
-TAUS = (0.005, 0.01, 0.02, 0.03, 0.05)  # margens de "dúvida" testadas
-
-# Classe Mapillary -> códigos RST aceites (SÓ para medir; nunca entra no catálogo)
-MLY_TO_RST = {
-    "information--pedestrians-crossing": ["H7"],
-    "regulatory--no-entry": ["C1"],
-    "regulatory--one-way-straight": ["H3"],
-    "regulatory--yield": ["B1"],
-    "regulatory--no-stopping": ["C16"],
-    "regulatory--stop": ["B2"],
-    "regulatory--keep-right": ["D3a"],
-    "regulatory--keep-left": ["D3b"],
-    "warning--road-bump": ["A2a"],
-    "regulatory--bicycles-only": ["D7a"],
-    "regulatory--roundabout": ["D4"],
-    "information--parking": ["H1a", "H1b"],
-    "regulatory--no-right-turn": ["C11a"],
-    "regulatory--no-left-turn": ["C11b"],
-    "regulatory--maximum-speed-limit-": ["C13"],
-    "information--dead-end": ["H4"],
-    "warning--two-way-traffic": ["A25"],
-    "warning--roundabout": ["B7"],
-    "regulatory--no-parking": ["C15"],
-    "regulatory--turn-right-ahead": ["D1e", "D1a"],
-    "regulatory--turn-left-ahead": ["D1d", "D1b"],
-    "regulatory--turn-right": ["D1a", "D1e"],
-    "regulatory--turn-left": ["D1b", "D1d"],
-    "regulatory--go-straight": ["D1c"],
-    "regulatory--go-straight-or-turn-right": ["D2b"],
-    "regulatory--go-straight-or-turn-left": ["D2a"],
-    "regulatory--turn-left-or-right": ["D2c"],
-    "regulatory--road-closed-to-vehicles": ["C2"],
-    "regulatory--buses-only": ["D6"],
-    "regulatory--height-limit": ["C9"],
-    "regulatory--weight-limit": ["C6", "C5"],
-    "regulatory--length-limit": ["C7"],
-    "regulatory--no-u-turn": ["C12"],
-    "warning--pedestrians-crossing": ["A16a", "A16b"],
-    "regulatory--end-of-bicycles-only": ["D13a"],
-    "regulatory--no-heavy-goods-vehicles": ["C3c", "C3b"],
-    "warning--roadworks": ["A23"],
-    "regulatory--dual-path-bicycles-and-pedestrians": ["D7e", "D7f"],
-    "warning--children": ["A14"],
-    "warning--traffic-signals": ["A22"],
-    "regulatory--no-overtaking": ["C14a"],
-    "warning--bicycles-crossing": ["A17"],
-    "warning--curve-right": ["A1a"],
-    "warning--curve-left": ["A1b"],
-    "regulatory--pedestrians-only": ["D7b"],
-    "warning--other-danger": ["A29"],
-    "regulatory--end-of-parking-zone": ["G6"],
-    "regulatory--end-of-no-parking": ["C21"],
-}
-
-
-def mly_codes(value):
-    base = value.rsplit("--", 1)[0]
-    if base.startswith("regulatory--maximum-speed-limit-"):
-        base = "regulatory--maximum-speed-limit-"
-    return MLY_TO_RST.get(base)
-
-
-# ------------------------------------------------------------------ referências
 def load_refs():
     with open(REF_OUT / "sinais.csv", encoding="utf-8") as f:
         rows = [r for r in csv.DictReader(f) if r["codigo"].startswith(FAMILIAS_RUA)
@@ -445,15 +374,9 @@ class Encoder:
     def __call__(self, images, batch=32):
         gs, ps = [], []
         for i in range(0, len(images), batch):
-            if self.nome == "dinov2":
-                x = self.proc(images=images[i:i + batch], return_tensors="pt",
-                              do_center_crop=False, size={"height": 224, "width": 224})
-                out = self.model(pixel_values=x["pixel_values"].to(self.device).half())
-                g, p = out.pooler_output, out.last_hidden_state[:, 1:]
-            else:
-                x = self.proc(images=images[i:i + batch], return_tensors="pt")
-                out = self.model.vision_model(pixel_values=x["pixel_values"].to(self.device).half())
-                g, p = out.pooler_output, out.last_hidden_state
+            x = self.proc(images=images[i:i + batch], return_tensors="pt")
+            out = self.model.vision_model(pixel_values=x["pixel_values"].to(self.device).half())
+            g, p = out.pooler_output, out.last_hidden_state
             g, p = g.float(), p.float()
             gs.append(g / g.norm(dim=-1, keepdim=True))
             # zonas guardadas na memória normal (no SigLIP: 729 zonas x 1152 números por
@@ -463,31 +386,6 @@ class Encoder:
 
 
 # ------------------------------------------------------------------ recortes da rua
-def street_cases(limit):
-    imgs = {r["id"]: r for r in csv.DictReader(open(DATA_DIR / "meta" / "sample_images.csv", encoding="utf-8"))}
-    refs = load_jsonl(DATA_DIR / "ground_truth" / "mly_detections.jsonl")
-    ours = load_jsonl(DATA_DIR / "preds" / "owlv2_classified.jsonl")
-    cases = []
-    for iid, rs in refs.items():
-        if iid not in imgs:
-            continue
-        area = float(imgs[iid]["thumb_w"]) * float(imgs[iid]["thumb_h"])
-        ps = [p for p in ours.get(iid, []) if p["category"] == "sinalizacao"]
-        for r in rs:
-            b = r["bbox"]
-            codes = mly_codes(r["value"]) if r["category"] == "sinalizacao" else None
-            if not codes or max(b[2] - b[0], b[3] - b[1]) < 24:
-                continue
-            cand = [p for p in ps if matches({"bbox": p["bbox"]}, r, area)]
-            if cand:
-                best = max(cand, key=lambda p: p["confidence"])
-                cases.append({"image_id": iid, "bbox": best["bbox"], "codes": codes,
-                              "mly": r["value"], "pano": imgs[iid]["is_pano"] == "True",
-                              "w": best["bbox"][2] - best["bbox"][0]})
-    random.Random(0).shuffle(cases)
-    return cases[:limit] if limit else cases
-
-
 def load_crops(cases):
     """Print de cada sinal (vista normal, ampliada), 224x224, sinal ~70% do quadro."""
     by_img = defaultdict(list)
@@ -509,102 +407,6 @@ def load_crops(cases):
             for i, im in res:
                 crops[i] = im
     return crops
-
-
-# ------------------------------------------------------------------ principal
-def cmd_testar(args):
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    rng = np.random.default_rng(0)
-
-    refs = load_refs()
-    pairs = mirror_pairs(refs)
-    print(f"{len(refs)} desenhos de referência · pares espelhados: "
-          + ", ".join(f"{a}/{b}" for a, b in sorted(pairs.items()) if a < b))
-
-    enc = Encoder(args.modelo, device)
-    t = time.time()
-    bank_imgs, bank_codes = [], []
-    for code, _, im in refs:
-        bank_imgs.append(framed(im))
-        bank_codes.append(code)
-        for _ in range(args.variacoes):
-            bank_imgs.append(augment(im, rng))
-            bank_codes.append(code)
-    bank_g, _ = enc(bank_imgs)
-    ref_img = {c: im for c, _, im in refs}
-    ref_gray = {c: gray64(im, REF_INNER) for c, im in ref_img.items()}
-    ref_idx = {c: i for i, c in enumerate(ref_img)}
-    _, ref_p = enc([framed(ref_img[c]) for c in ref_img])
-    print(f"Banco: {len(bank_imgs)} imagens ({time.time() - t:.0f} s)")
-
-    cases = street_cases(args.limite)
-    t = time.time()
-    crops = load_crops(cases)
-    g, p = enc(crops)
-    print(f"{len(cases)} recortes da rua ({time.time() - t:.0f} s)")
-
-    codes_arr = np.array(bank_codes)
-    uniq = np.unique(codes_arr)
-    sims = (g @ bank_g.T).cpu().numpy()
-    best = np.stack([sims[:, codes_arr == u].max(1) for u in uniq], 1)  # melhor por código
-    col = {str(u): i for i, u in enumerate(uniq)}
-    res, lr, lr_tau = Counter(), Counter(), Counter()
-    by_mly = defaultdict(Counter)
-    for k, c in enumerate(cases):
-        top = str(uniq[best[k].argmax()])
-        preds = {m: top for m in METODOS}
-        if top in pairs:
-            other = pairs[top]
-            cg = gray64(crops[k], CROP_INNER)
-            px = top if ncc(cg, ref_gray[top]) >= ncc(cg, ref_gray[other]) else other
-            preds["+pixeis"] = px
-            # combinado: o píxel só decide quando o modelo hesita entre os dois lados
-            margin = best[k, col[top]] - best[k, col[other]]
-            preds["+pixeis_se_duvida"] = px if margin < args.duvida else top
-            for tau in TAUS:
-                lr_tau[tau] += (px if margin < tau else top) in c["codes"] if any(
-                    x in pairs for x in c["codes"]) else 0
-            pk = p[k].float()
-            za = float((pk * ref_p[ref_idx[top]].float()).sum(-1).mean())
-            zb = float((pk * ref_p[ref_idx[other]].float()).sum(-1).mean())
-            preds["+zonas"] = top if za >= zb else other
-        res["n"] += 1
-        for m, v in preds.items():
-            ok = v in c["codes"]
-            res[m] += ok
-            by_mly[c["mly"].rsplit("--", 1)[0]][m] += ok
-        # esquerda/direita: casos cuja resposta certa está num par espelhado
-        if any(x in pairs for x in c["codes"]):
-            lr["n"] += 1
-            for m, v in preds.items():
-                lr[m] += v in c["codes"]
-
-    n = res["n"]
-    print(f"\nModelo: {args.modelo}. Código exato certo ({n} sinais):")
-    for m in METODOS:
-        print(f"  {m:<18} {res[m] / n:.0%}")
-    if lr["n"]:
-        print(f"\nSó sinais de pares esquerda/direita ({lr['n']} sinais):")
-        for m in METODOS:
-            print(f"  {m:<18} {lr[m] / lr['n']:.0%}")
-        print("  píxel decide se a diferença do modelo entre os dois lados for menor que: "
-              + " · ".join(f"{t}: {lr_tau[t] / lr['n']:.0%}" for t in TAUS))
-    print("\nPor classe Mapillary (n · " + " · ".join(METODOS) + "):")
-    tot = Counter(c["mly"].rsplit("--", 1)[0] for c in cases)
-    for k, v in tot.most_common(30):
-        b = by_mly[k]
-        print(f"  {v:>4}  " + " ".join(f"{b[m] / v:>5.0%}" for m in METODOS) + f"  {k}")
-    out = DATA_DIR / "relatorios" / f"semelhanca_{args.modelo}.json"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({
-        "modelo": args.modelo, "n": n,
-        "certo": {m: round(res[m] / n, 3) for m in METODOS},
-        "pares_esq_dir": {"n": lr["n"], **{m: round(lr[m] / max(1, lr["n"]), 3) for m in METODOS}},
-        "por_classe": {k: {"n": v, **{m: round(by_mly[k][m] / v, 3) for m in METODOS}}
-                       for k, v in tot.most_common()},
-        "pares": sorted(f"{a}/{b}" for a, b in pairs.items() if a < b)},
-        ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"-> {out}")
 
 
 # ================================================================== codigo (passo da pipeline)
@@ -707,14 +509,8 @@ def main_desenhos(argv=None):
     p.add_argument("--duvida", type=float, default=0.02)
     p.add_argument("--min-outro", type=float, default=0.84,
                    help="tipo 'outro' só recebe nome oficial com semelhança >= isto")
-    p = sub.add_parser("testar", help="medir a semelhança recorte da rua -> desenho")
-    p.add_argument("--modelo", choices=list(MODELOS), default="siglip")
-    p.add_argument("--variacoes", type=int, default=10, help="variações por desenho")
-    p.add_argument("--limite", type=int, default=0, help="n.º de recortes a testar (0 = todos)")
-    p.add_argument("--duvida", type=float, default=0.02,
-                   help="o teste do espelho só decide se o modelo hesitar menos que isto")
     args = ap.parse_args(argv)
-    {"extrair": cmd_extrair, "testar": cmd_testar, "codigo": cmd_aplicar}[args.cmd](args)
+    {"extrair": cmd_extrair, "codigo": cmd_aplicar}[args.cmd](args)
 
 
 ####################################################################################################
@@ -722,7 +518,6 @@ SECOES = {
     "limites": (main_limites, "número dos limites de velocidade"),
     "codigo": (lambda a, c="codigo": main_desenhos([c, *a]), "código e nome oficial"),
     "extrair": (lambda a, c="extrair": main_desenhos([c, *a]), "desenhos do PDF da DGV"),
-    "testar": (lambda a, c="testar": main_desenhos([c, *a]), "medir a escolha do código"),
 }
 
 

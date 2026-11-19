@@ -67,10 +67,17 @@ def prepare(row, tiling=True):
     """Lê a imagem e devolve uma lista de vistas 960x960 + info para desfazer.
     360°: 6 vistas de 90°. Frontal: a foto inteira + (tiling) metade esquerda e direita
     com sobreposição, para os sinais pequenos ao fundo terem mais resolução."""
-    im = np.asarray(Image.open(DATA_DIR / "images" / row["file"]).convert("RGB"))
+    im = Image.open(DATA_DIR / "images" / row["file"]).convert("RGB")
+    return row, prepare_views(im, panoramic=row["is_pano"] == "True", tiling=tiling)
+
+
+def prepare_views(image, *, panoramic=False, tiling=True):
+    """Imagem (PIL ou array RGB) já em memória -> [(vista 960x960, info)]. Usado pela pipeline
+    (prepare) e pela app (fotos enviadas)."""
+    im = np.asarray(image)
     H, W = im.shape[:2]
     views = []
-    if row["is_pano"] == "True":
+    if panoramic:
         for yaw in YAWS:
             views.append((perspective_view(im, yaw, FOV, SIZE), {"pano": True, "W": W, "H": H, "yaw": yaw}))
     else:
@@ -81,7 +88,7 @@ def prepare(row, tiling=True):
         for a, b in parts:
             canvas, s, ox = letterbox(im[:, a:b], a)
             views.append((canvas, {"pano": False, "W": W, "H": H, "scale": s, "ox": ox}))
-    return row, views
+    return views
 
 
 def to_original(box, info):
@@ -102,7 +109,9 @@ class Owlv2:
         name = MODELS["owlv2"]
         limit_vram()  # máx. 95% da VRAM (evita o Windows usar a RAM normal)
         self.proc = Owlv2Processor.from_pretrained(name)
-        self.model = Owlv2ForObjectDetection.from_pretrained(name, dtype=torch.float16).to(device).eval()
+        # meia precisão só na placa gráfica (no processador o float16 é lento ou não existe)
+        self.dtype = torch.float16 if torch.device(device).type == "cuda" else torch.float32
+        self.model = Owlv2ForObjectDetection.from_pretrained(name, dtype=self.dtype).to(device).eval()
         self.device = device
         tok = self.proc(text=[list(PROMPTS)], return_tensors="pt")
         self.ids, self.mask = tok["input_ids"].to(device), tok["attention_mask"].to(device)
@@ -111,7 +120,7 @@ class Owlv2:
     @torch.inference_mode()
     def __call__(self, arrays, threshold):
         x = torch.from_numpy(np.stack(arrays)).to(self.device).permute(0, 3, 1, 2).float() / 255
-        x = ((x - self.mean) / self.std).half()
+        x = ((x - self.mean) / self.std).to(self.dtype)
         B = x.shape[0]
         out = self.model(input_ids=self.ids.repeat(B, 1), attention_mask=self.mask.repeat(B, 1),
                          pixel_values=x)
