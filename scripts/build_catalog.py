@@ -94,6 +94,17 @@ def element(items, tax, imgs):
         label = label.replace("{n}", str(valor)) if valor else label.replace(" {n} km/h", "")
     meta = imgs.get(best["image_id"], {})
     image_ids = sorted({d["image_id"] for d in items})
+    views = {}
+    for detection in sorted(items, key=lambda item: item["confidence"], reverse=True):
+        image_id = detection["image_id"]
+        if image_id == best["image_id"] or image_id in views:
+            continue
+        image_meta = imgs.get(image_id, {})
+        views[image_id] = {
+            "imagem_id": image_id, "imagem_bbox": [round(value) for value in detection["bbox"]],
+            "imagem_url": image_meta.get("source_url"), "autor": image_meta.get("creator_username"),
+            "licenca": image_meta.get("license") or "CC BY-SA 4.0",
+        }
     return {
         "categoria": cat, "categoria_label": tax["categorias"][cat]["label"],
         "subtipo": sub, "label": label, "codigo": info.get("codigo"), "valor": valor,
@@ -104,8 +115,8 @@ def element(items, tax, imgs):
         "n_vistas": len(items), "n_imagens": len(image_ids),
         "imagem_id": best["image_id"], "imagem_bbox": [round(v) for v in best["bbox"]],
         "imagem_url": meta.get("source_url"), "autor": meta.get("creator_username"),
-        "licenca": meta.get("license") or "CC BY-SA 4.0", "fonte": "Mapillary",
-        "imagens": image_ids, "estado": "automatico", "membros": None,
+        "licenca": meta.get("license") or "CC BY-SA 4.0", "fonte": "Deteções do catálogo",
+        "imagens": image_ids, "vistas_foto": list(views.values()), "estado": "automatico", "membros": None,
     }
 
 

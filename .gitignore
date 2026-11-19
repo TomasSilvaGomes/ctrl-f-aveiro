@@ -16,6 +16,8 @@ data/*/images/
 data/viz/
 data/*/viz/
 data/**/*.antes*.jsonl
+data/**/contribuicoes.sqlite3*
+data/**/previews/
 data/piloto_*/ground_truth/*.geojson
 *.zip
 weights/

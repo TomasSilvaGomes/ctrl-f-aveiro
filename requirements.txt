@@ -8,6 +8,7 @@ shapely>=2.0
 numpy>=1.26
 opencv-python>=4.9
 pillow>=10.0
+pillow-heif>=0.21    # fotos HEIC/HEIF de telemóveis
 pyyaml>=6.0
 tqdm>=4.66
 pandas>=2.0

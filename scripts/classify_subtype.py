@@ -39,7 +39,6 @@ from evaluate import load_jsonl, nms_by_category  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 SIGLIP = "google/siglip-so400m-patch14-384"  # Apache 2.0
 CROP = 384
-Image.MAX_IMAGE_PIXELS = None
 
 
 def load_taxonomy():
@@ -86,7 +85,8 @@ class Classifier:
     def __init__(self, tax, device):
         from transformers import AutoModel, AutoProcessor
         self.proc = AutoProcessor.from_pretrained(SIGLIP)
-        self.model = AutoModel.from_pretrained(SIGLIP, dtype=torch.float16).to(device).eval()
+        self.dtype = torch.float16 if torch.device(device).type == "cuda" else torch.float32
+        self.model = AutoModel.from_pretrained(SIGLIP, dtype=self.dtype).to(device).eval()
         self.device = device
         self.tables = {}  # categoria -> (embeddings de texto, [(subtipo|None, ...)])
         for cat, spec in tax["categorias"].items():
@@ -116,7 +116,7 @@ class Classifier:
     def __call__(self, crops, cats):
         # recortes já vêm 384x384: normalização SigLIP (média 0.5, desvio 0.5) na GPU
         arr = torch.from_numpy(np.stack([np.asarray(c) for c in crops])).to(self.device)
-        pv = ((arr.permute(0, 3, 1, 2).float() / 255 - 0.5) / 0.5).half()
+        pv = ((arr.permute(0, 3, 1, 2).float() / 255 - 0.5) / 0.5).to(self.dtype)
         img = self._tensor(self.model.get_image_features(pixel_values=pv)).float()
         img = img / img.norm(dim=-1, keepdim=True)
         out = []
@@ -133,6 +133,7 @@ class Classifier:
 
 
 def main():
+    Image.MAX_IMAGE_PIXELS = None
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="owlv2")
     ap.add_argument("--det-threshold", type=float, default=0.2)

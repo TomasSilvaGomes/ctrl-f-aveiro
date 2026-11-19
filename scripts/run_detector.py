@@ -61,12 +61,18 @@ def prepare(row):
         for yaw in YAWS:
             views.append((perspective_view(im, yaw, FOV, SIZE), {"pano": True, "W": W, "H": H, "yaw": yaw}))
     else:
-        s = SIZE / max(W, H)
-        small = np.asarray(Image.fromarray(im).resize((round(W * s), round(H * s)), Image.BILINEAR))
-        canvas = np.full((SIZE, SIZE, 3), 127, dtype=np.uint8)
-        canvas[: small.shape[0], : small.shape[1]] = small
-        views.append((canvas, {"pano": False, "W": W, "H": H, "scale": s}))
+        views.append(prepare_flat(Image.fromarray(im)))
     return row, views
+
+
+def prepare_flat(image):
+    width, height = image.size
+    scale = SIZE / max(width, height)
+    size = max(1, round(width * scale)), max(1, round(height * scale))
+    small = np.asarray(image.resize(size, Image.Resampling.BILINEAR))
+    canvas = np.full((SIZE, SIZE, 3), 127, dtype=np.uint8)
+    canvas[:size[1], :size[0]] = small
+    return canvas, {"pano": False, "W": width, "H": height, "scale": scale}
 
 
 def to_original(box, info):
@@ -85,7 +91,8 @@ class Owlv2:
         from transformers import Owlv2ForObjectDetection, Owlv2Processor
         name = MODELS["owlv2"]
         self.proc = Owlv2Processor.from_pretrained(name)
-        self.model = Owlv2ForObjectDetection.from_pretrained(name, dtype=torch.float16).to(device).eval()
+        self.dtype = torch.float16 if torch.device(device).type == "cuda" else torch.float32
+        self.model = Owlv2ForObjectDetection.from_pretrained(name, dtype=self.dtype).to(device).eval()
         self.device = device
         tok = self.proc(text=[list(PROMPTS)], return_tensors="pt")
         self.ids, self.mask = tok["input_ids"].to(device), tok["attention_mask"].to(device)
@@ -94,7 +101,7 @@ class Owlv2:
     @torch.inference_mode()
     def __call__(self, arrays, threshold):
         x = torch.from_numpy(np.stack(arrays)).to(self.device).permute(0, 3, 1, 2).float() / 255
-        x = ((x - self.mean) / self.std).half()
+        x = ((x - self.mean) / self.std).to(self.dtype)
         B = x.shape[0]
         out = self.model(input_ids=self.ids.repeat(B, 1), attention_mask=self.mask.repeat(B, 1),
                          pixel_values=x)

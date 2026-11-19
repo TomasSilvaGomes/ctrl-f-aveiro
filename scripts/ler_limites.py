@@ -41,7 +41,6 @@ from estimate_mapillary import DATA_DIR  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 
-Image.MAX_IMAGE_PIXELS = None
 SIGLIP = "google/siglip-so400m-patch14-384"
 SPEEDS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120]
 SCALE, MARGIN = 4, 1.4
@@ -76,10 +75,15 @@ def flat_print(img, box):
 
 
 class SpeedReader:
-    def __init__(self, device):
-        from transformers import AutoModel, AutoProcessor
-        self.proc = AutoProcessor.from_pretrained(SIGLIP)
-        self.model = AutoModel.from_pretrained(SIGLIP, dtype=torch.float16).to(device).eval()
+    def __init__(self, device, classifier=None):
+        self.dtype = torch.float16 if torch.device(device).type == "cuda" else torch.float32
+        if classifier is None:
+            from transformers import AutoModel, AutoProcessor
+            self.proc = AutoProcessor.from_pretrained(SIGLIP)
+            self.model = AutoModel.from_pretrained(SIGLIP, dtype=self.dtype).to(device).eval()
+        else:
+            self.proc = classifier.proc
+            self.model = classifier.model
         self.device = device
         with torch.inference_mode():
             tok = self.proc(text=[f"This is a photo of a round speed limit traffic sign with the number {n}."
@@ -94,7 +98,7 @@ class SpeedReader:
     @torch.inference_mode()
     def __call__(self, view):
         im = Image.fromarray(view).resize((384, 384), Image.BICUBIC)
-        pv = self.proc(images=im, return_tensors="pt")["pixel_values"].to(self.device).half()
+        pv = self.proc(images=im, return_tensors="pt")["pixel_values"].to(self.device, dtype=self.dtype)
         e = self._t(self.model.get_image_features(pixel_values=pv))
         p = torch.softmax((e / e.norm(dim=-1, keepdim=True)) @ self.text.T * self.model.logit_scale.exp().float(), -1)[0]
         i = int(p.argmax())
@@ -102,6 +106,7 @@ class SpeedReader:
 
 
 def main():
+    Image.MAX_IMAGE_PIXELS = None
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="owlv2")
     ap.add_argument("--rever", type=float, default=0.6, help="abaixo desta confiança: a rever")
