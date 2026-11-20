@@ -21,6 +21,7 @@
 | Imagens **Mapillary** | CC BY-SA 4.0 (imagens); Termos Mapillary (fev/2024) permitem uso comercial, incluindo treino de algoritmos | 🟡 | Atribuição por imagem: autor, link, licença e indicação de alteração ("anonimizada/recortada"). Recortes e imagens que mostramos/exportamos ficam CC BY-SA. Guardar `creator` e `image_id` em cada observação. |
 | API Mapillary (`detections`, `map_features`) | Não encontrámos licença própria explícita | 🟠 | **Só para validação** (métricas). Nunca entram no catálogo. |
 | Imagens **KartaView** | CC BY-SA 4.0 (imagens); software MIT/proprietário | 🟡 ⚪ | Mesmas obrigações da Mapillary. Confirmar texto atual em kartaview.org/terms. |
+| **GeoNames** (`PT.zip` → `data/meta/localidades_pt.csv`, pesquisa de localidades da app) | CC BY 4.0 | 🟢 | Atribuição: "Localidades: GeoNames (geonames.org), CC BY 4.0". Só nomes e coordenadas de localidades. |
 | **Vídeos próprios** | Nossos | 🟢 | R1: anonimizar antes de guardar; vídeo original nunca entra na aplicação. |
 | Google Street View / Google Maps imagery | Termos Google Maps Platform | 🔴 | Proíbem extrair/guardar conteúdo e criar dados a partir dele. |
 

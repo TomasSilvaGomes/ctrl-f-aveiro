@@ -1,10 +1,10 @@
 const layer = L.layerGroup();
-const dotRenderer = L.canvas({ padding: 0.35, tolerance: 4 });
 const MIN_POINT_ZOOM = 13;
 const ICON_ZOOM = 17;
+const OVERVIEW_SPACING = 34;
 const points = rows.map(([lat, lng, data]) => ({
     lat, lng, latlng: L.latLng(lat, lng),
-    entries: data.map(([id, icon, label, color]) => ({ id, icon, label, color })),
+    entries: data.map(([id, icon, label]) => ({ id, icon, label })),
 })).sort((left, right) => left.lat - right.lat);
 const visible = new Map();
 let activePoint = null;
@@ -37,6 +37,7 @@ function selectEntry(point, entry) {
     visible.get(activePoint)?.getElement?.()?.classList.remove("catalog-selected");
     activePoint = point;
     visible.get(point)?.getElement?.()?.classList.add("catalog-selected");
+    scheduleRefresh();
     window.catalogSelectionRevision = (window.catalogSelectionRevision || 0) + 1;
     window.Streamlit.setComponentValue({
         catalog_selection: { id: entry.id, lat: point.lat, lng: point.lng, revision: window.catalogSelectionRevision }
@@ -48,12 +49,12 @@ function choiceMenu(anchor, entries) {
     let page = 0;
     const shell = document.createElement("section");
     shell.className = "catalog-choice";
-    shell.setAttribute("aria-label", "Escolher elemento");
+    shell.setAttribute("aria-label", "Escolher elemento na área");
     L.DomEvent.disableClickPropagation(shell);
     L.DomEvent.disableScrollPropagation(shell);
 
     const heading = document.createElement("strong");
-    heading.textContent = "Escolher elemento";
+    heading.textContent = "Escolher elemento na área";
     shell.append(heading);
     const grid = document.createElement("div");
     grid.className = "catalog-choice-grid";
@@ -62,19 +63,24 @@ function choiceMenu(anchor, entries) {
     footer.className = "catalog-choice-footer";
     shell.append(footer);
 
-    function action(label, callback, disabled = false) {
+    function action(label, callback) {
         const button = document.createElement("button");
         button.type = "button";
         button.textContent = label;
-        button.disabled = disabled;
-        button.addEventListener("click", callback);
+        button.addEventListener("click", event => {
+            L.DomEvent.stopPropagation(event);
+            callback();
+        });
         return button;
     }
+
+    const previous = action("Anterior", () => { page -= 1; showPage(); });
+    const next = action("Seguinte", () => { page += 1; showPage(); });
+    if (entries.length > pageSize) footer.append(previous, next);
 
     function showPage() {
         const start = page * pageSize;
         grid.replaceChildren();
-        footer.replaceChildren();
         for (const [point, entry] of entries.slice(start, start + pageSize)) {
             const button = action("", () => selectEntry(point, entry));
             button.className = "catalog-choice-item";
@@ -88,12 +94,8 @@ function choiceMenu(anchor, entries) {
             button.append(icon, text);
             grid.append(button);
         }
-        if (entries.length > pageSize) {
-            footer.append(
-                action("Anterior", () => { page -= 1; showPage(); }, page === 0),
-                action("Seguinte", () => { page += 1; showPage(); }, start + pageSize >= entries.length),
-            );
-        }
+        previous.disabled = page === 0;
+        next.disabled = start + pageSize >= entries.length;
     }
 
     showPage();
@@ -107,8 +109,7 @@ function choiceMenu(anchor, entries) {
 
 function clickPoint(point) {
     const center = map.latLngToContainerPoint(point.latlng);
-    const radius = detailed ? 35 : 7;
-    const shift = L.point(radius, radius);
+    const shift = L.point(OVERVIEW_SPACING, OVERVIEW_SPACING);
     const hit = L.latLngBounds(
         map.containerPointToLatLng(center.subtract(shift)),
         map.containerPointToLatLng(center.add(shift)),
@@ -123,23 +124,30 @@ function clickPoint(point) {
 
 function pointLayer(point) {
     const first = point.entries[0];
-    if (!detailed) {
-        return L.circleMarker(point.latlng, {
-            renderer: dotRenderer, radius: 2.7, color: "#ffffff", opacity: 0.8, weight: 0.75,
-            fillColor: first.color, fillOpacity: 0.93, bubblingMouseEvents: false,
-        });
-    }
+    const size = detailed ? 34 : 26;
     const stack = point.entries.length > 1 ? " catalog-marker-stack" : "";
-    const marker = L.marker(point.latlng, {
-        title: stack ? "Escolher elemento" : first.label,
+    const overview = detailed ? "" : " catalog-marker-overview";
+    const hint = document.createElement("span");
+    hint.textContent = first.label;
+    return L.marker(point.latlng, {
+        alt: first.label,
         icon: L.divIcon({
-            className: "catalog-map-marker" + (point === activePoint ? " catalog-selected" : ""),
+            className: "catalog-map-marker" + overview + (point === activePoint ? " catalog-selected" : ""),
             html: '<div class="catalog-marker-glyph' + stack + '">' + icons[first.icon] + '</div>',
-            iconSize: [34, 34],
-            iconAnchor: [17, 17],
+            iconSize: [size, size],
+            iconAnchor: [size / 2, size / 2],
         }),
-    });
-    return marker;
+    }).bindTooltip(hint, { direction: "top", offset: [0, -size / 2 - 2], opacity: 1, className: "catalog-tooltip" });
+}
+
+function spreadIcons(candidates, zoom) {
+    const cells = new Map();
+    for (const point of candidates) {
+        const pixels = map.project(point.latlng, zoom);
+        const cell = Math.floor(pixels.x / OVERVIEW_SPACING) + ":" + Math.floor(pixels.y / OVERVIEW_SPACING);
+        if (point === activePoint || !cells.has(cell)) cells.set(cell, point);
+    }
+    return cells.values();
 }
 
 function refresh() {
@@ -148,7 +156,6 @@ function refresh() {
     if (zoom < MIN_POINT_ZOOM) {
         layer.clearLayers();
         visible.clear();
-        if (map.hasLayer(dotRenderer)) map.removeLayer(dotRenderer);
         if (menu && map.hasLayer(menu)) map.removeLayer(menu);
         return;
     }
@@ -158,7 +165,8 @@ function refresh() {
         visible.clear();
         detailed = nextMode;
     }
-    const next = new Set(pointsIn(map.getBounds().pad(0.16)));
+    const candidates = pointsIn(map.getBounds().pad(0.16));
+    const next = new Set(detailed ? candidates : spreadIcons(candidates, zoom));
     for (const [point, marker] of visible) {
         if (!next.has(point)) {
             layer.removeLayer(marker);
@@ -187,6 +195,5 @@ layer.on("remove", () => {
     cancelAnimationFrame(frame);
     layer.clearLayers();
     visible.clear();
-    if (map.hasLayer(dotRenderer)) map.removeLayer(dotRenderer);
     if (menu && map.hasLayer(menu)) map.removeLayer(menu);
 });

@@ -24,6 +24,39 @@ from comum import Desfocar, load_taxonomy, nms_by_category  # noqa: E402
 from detetar import PROMPTS, Owlv2, prepare_views, to_original  # noqa: E402
 from sinais import SpeedReader  # noqa: E402
 
+_PRIVACY = None
+_PRIVACY_LOCK = Lock()
+
+
+def privacy_model():
+    """Caras e matrículas: EgoBlur Gen2 (comum.Desfocar, o mesmo da pipeline, Apache 2.0), carregado
+    uma vez por processo. Sem os pesos pára tudo: nunca se guarda nem mostra uma foto sem anonimizar."""
+    global _PRIVACY
+    if _PRIVACY is None:
+        try:
+            _PRIVACY = Desfocar("cuda" if torch.cuda.is_available() else "cpu")
+        except FileNotFoundError as error:
+            raise PrivacyModelsMissing(
+                "A anonimização está indisponível: faltam os pesos EgoBlur Gen2 em weights/ "
+                "(ego_blur_face_gen2.jit e ego_blur_lp_gen2.jit)."
+            ) from error
+    return _PRIVACY
+
+
+def privacy_boxes(rgb):
+    """Imagem RGB (numpy) -> caixas [x0, y0, x1, y1] de caras e matrículas."""
+    with _PRIVACY_LOCK:
+        return privacy_model().caixas(np.ascontiguousarray(rgb[:, :, ::-1]))
+
+
+def anonymize(image):
+    """PIL -> cópia RGB com caras e matrículas desfocadas na foto inteira (elipse desfocada, como a
+    pipeline faz às fotos próprias). Também nas do Mapillary: o desfoque deles às vezes falha."""
+    bgr = np.ascontiguousarray(np.asarray(image.convert("RGB"))[:, :, ::-1])
+    with _PRIVACY_LOCK:
+        blurred, _ = privacy_model()(bgr)
+    return Image.fromarray(np.ascontiguousarray(blurred[:, :, ::-1]))
+
 
 class PhotoAnalyzer:
     def __init__(self):
@@ -37,28 +70,15 @@ class PhotoAnalyzer:
         self.detector = Owlv2(self.device)
         self.classifier = None
         self.speed_reader = None
-        self.privacy_regions = None
         self.lock = Lock()
-
-    def _load_privacy_models(self):
-        """Caras e matrículas: EgoBlur Gen2 (comum.Desfocar, o mesmo da pipeline, Apache 2.0).
-        Sem os pesos a análise pára: nunca se guarda uma foto sem anonimizar."""
-        try:
-            desfocar = Desfocar(self.device)
-        except FileNotFoundError as error:
-            raise PrivacyModelsMissing(
-                "A anonimização está indisponível: faltam os pesos EgoBlur Gen2 em weights/ "
-                "(ego_blur_face_gen2.jit e ego_blur_lp_gen2.jit)."
-            ) from error
-        return lambda rgb: desfocar.caixas(np.ascontiguousarray(rgb[:, :, ::-1]))
 
     @torch.inference_mode()
     def _safe_jpeg(self, crop, max_size=640):
-        if self.privacy_regions is None:
-            self.privacy_regions = self._load_privacy_models()
+        """2.ª passagem, em cada recorte e na foto guardada: o recorte vê as caras maiores do que a foto
+        inteira reduzida a 1200 px, por isso apanha as que a 1.ª passagem (anonymize) deixou."""
         crop.thumbnail((960, 960), Image.Resampling.LANCZOS)
         draw = ImageDraw.Draw(crop)
-        for left, top, right, bottom in self.privacy_regions(np.asarray(crop)):
+        for left, top, right, bottom in privacy_boxes(np.asarray(crop)):
             pad_x = (right - left) * 0.20
             pad_y = (bottom - top) * 0.20
             bounds = (
@@ -69,15 +89,14 @@ class PhotoAnalyzer:
         crop.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
         return jpeg_bytes(crop)
 
-    @staticmethod
-    def _published_jpeg(image, max_size=640):
-        image.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
-        return jpeg_bytes(image)
-
-    def analyze(self, image, *, already_anonymized=False, panoramic=False):
+    def analyze(self, image, *, panoramic=False):
+        """Desfoca a foto inteira ANTES da deteção (como a pipeline) e cada imagem guardada outra vez."""
         with self.lock:
-            save_photo = self._published_jpeg if already_anonymized else self._safe_jpeg
-            return self._analyze(image, save_photo, panoramic)
+            return self._analyze(anonymize(image), self._safe_jpeg, panoramic)
+
+    def preview_without_detections(self, image):
+        with self.lock:
+            return PhotoPreview(self._safe_jpeg(anonymize(image), max_size=960))
 
     def _analyze(self, image, save_photo, panoramic):
         detections = []

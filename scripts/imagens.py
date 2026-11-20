@@ -148,9 +148,11 @@ def contour_key(d):
 
 
 def load_polys():
-    """Contornos guardados pelo passo contorno: chave -> polígonos. Lê a cache do SAM 2 large
-    (contorno_cache.jsonl) e depois as dos outros modelos (contorno_cache_<modelo>.jsonl, --sam)."""
-    caches = sorted((DATA_DIR / "preds").glob("contorno_cache*.jsonl"), key=lambda p: p.name != "contorno_cache.jsonl")
+    """Contornos guardados pelo passo contorno: chave -> polígonos. Primeiro a cache do SAM 2 small
+    (contorno_cache_small.jsonl, o modelo em uso), depois a do large (contorno_cache.jsonl, catálogo
+    antigo) e as dos outros modelos (contorno_cache_<modelo>.jsonl, --sam)."""
+    ordem = {"contorno_cache_small.jsonl": 0, "contorno_cache.jsonl": 1}
+    caches = sorted((DATA_DIR / "preds").glob("contorno_cache*.jsonl"), key=lambda p: (ordem.get(p.name, 2), p.name))
     out = {}
     for p in caches:
         for ln in open(p, encoding="utf-8"):

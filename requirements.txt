@@ -18,6 +18,6 @@ huggingface_hub>=0.24
 piexif>=1.1.3        # EXIF (GPS + atribuição) nas fotos capturadas
 pypdfium2>=4.30      # desenhos dos sinais do PDF (não usar PyMuPDF: AGPL)
 # app (pasta app/): mapa e fichas
-streamlit>=1.57
+streamlit>=1.64     # st.popover/st.expander com .open, selectbox com filter_mode
 folium>=0.15
 streamlit-folium>=0.25

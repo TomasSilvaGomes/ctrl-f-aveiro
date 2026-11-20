@@ -1,4 +1,4 @@
-"""Entrada de fotografias e armazenamento dos recortes publicados."""
+"""Entrada, revisão e publicação das contribuições fotográficas."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import json
 import math
 import sqlite3
 from contextlib import closing
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -89,6 +90,7 @@ class ContributionStore:
         if not self.path.exists():
             return []
         with closing(sqlite3.connect(f"{self.path.as_uri()}?mode=ro", uri=True)) as db:
+            db.row_factory = sqlite3.Row
             if not db.execute("SELECT 1 FROM sqlite_master WHERE name = ?", (table,)).fetchone():
                 return []
             return db.execute(sql, parameters).fetchall()
@@ -109,13 +111,15 @@ class ContributionStore:
         return PhotoPreview(*rows[0], box=box) if rows else None
 
     def has_photo(self, digest):
-        return bool(self._read("SELECT 1 FROM photos WHERE digest = ?", (digest,)))
+        return bool(self._read("SELECT 1 FROM photos WHERE digest = ?", (digest,), table="photos"))
 
-    def publish(self, digest, latitude, longitude, location_source, detections):
+    def submit(self, digest, latitude, longitude, location_source, detections, *, name, source, preview=None, credit=None):
         if not (math.isfinite(latitude) and -90 <= latitude <= 90
                 and math.isfinite(longitude) and -180 <= longitude <= 180):
             raise ValueError("Indique coordenadas válidas para a fotografia.")
         upload_id = f"FOTO-{uuid4().hex[:12]}"
+        submitted_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        detection_count = len(detections)
         if not detections:
             detections = [({
                 "categoria": PHOTO_CATEGORY,
@@ -123,7 +127,7 @@ class ContributionStore:
                 "subtipo": "sem_deteccoes",
                 "label": "Fotografia sem elementos detetados",
                 "confianca": None,
-            }, None)]
+            }, None, preview)]
         rows, masks = [], []
         preview_image = None
         for index, detection in enumerate(detections, start=1):
@@ -135,6 +139,7 @@ class ContributionStore:
                 "geometry": {"type": "Point", "coordinates": [longitude, latitude]},
                 "properties": {
                     **properties,
+                    **(credit or {}),
                     "id": element_id,
                     "contribuicao_id": upload_id,
                     "fonte": SOURCE,
@@ -148,7 +153,7 @@ class ContributionStore:
                 preview_image = preview.image
                 masks.append((element_id, upload_id, preview.mask))
                 feature["properties"]["imagem_bbox_relativa"] = preview.box
-            rows.append((element_id, json.dumps(feature, ensure_ascii=False), crop))
+            rows.append((element_id, upload_id, json.dumps(feature, ensure_ascii=False), crop))
 
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with closing(sqlite3.connect(self.path)) as db, db:
@@ -157,16 +162,99 @@ class ContributionStore:
             db.execute(
                 "CREATE TABLE IF NOT EXISTS elements (id TEXT PRIMARY KEY, feature TEXT NOT NULL, crop BLOB)"
             )
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS photo_requests (
+                    id TEXT PRIMARY KEY, name TEXT NOT NULL, source TEXT NOT NULL,
+                    latitude REAL NOT NULL, longitude REAL NOT NULL, detection_count INTEGER NOT NULL,
+                    status TEXT NOT NULL, submitted_at TEXT NOT NULL
+                )
+            """)
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS request_elements (
+                    id TEXT PRIMARY KEY, request_id TEXT NOT NULL, feature TEXT NOT NULL, crop BLOB
+                )
+            """)
+            db.execute("CREATE INDEX IF NOT EXISTS request_elements_by_request ON request_elements (request_id)")
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS photo_review_log (
+                    id INTEGER PRIMARY KEY, request_id TEXT NOT NULL, action TEXT NOT NULL,
+                    at TEXT NOT NULL, note TEXT NOT NULL
+                )
+            """)
             result = db.execute("INSERT OR IGNORE INTO photos VALUES (?)", (digest,))
             if not result.rowcount:
                 return None
-            db.executemany("INSERT INTO elements VALUES (?, ?, ?)", rows)
+            db.execute(
+                "INSERT INTO photo_requests VALUES (?, ?, ?, ?, ?, ?, 'pendente', ?)",
+                (upload_id, name, source, latitude, longitude, detection_count, submitted_at),
+            )
+            db.executemany("INSERT INTO request_elements VALUES (?, ?, ?, ?)", rows)
             if masks:
                 db.execute("CREATE TABLE IF NOT EXISTS preview_photos (id TEXT PRIMARY KEY, image BLOB NOT NULL)")
                 db.execute("CREATE TABLE IF NOT EXISTS preview_masks (id TEXT PRIMARY KEY, photo_id TEXT NOT NULL, mask BLOB)")
                 db.execute("INSERT INTO preview_photos VALUES (?, ?)", (upload_id, preview_image))
                 db.executemany("INSERT INTO preview_masks VALUES (?, ?, ?)", masks)
+            db.execute(
+                "INSERT INTO photo_review_log (request_id, action, at, note) VALUES (?, 'submetido', ?, '')",
+                (upload_id, submitted_at),
+            )
         return upload_id
+
+    def requests(self, status):
+        rows = self._read(
+            "SELECT * FROM photo_requests WHERE status = ? ORDER BY submitted_at, rowid",
+            (status,), table="photo_requests",
+        )
+        return [dict(row) for row in rows]
+
+    def pending_count(self):
+        rows = self._read("SELECT COUNT(*) FROM photo_requests WHERE status = 'pendente'", table="photo_requests")
+        return rows[0][0] if rows else 0
+
+    def request_features(self, request_id):
+        rows = self._read("""
+            SELECT feature FROM request_elements WHERE request_id = ?
+            UNION ALL
+            SELECT feature FROM elements WHERE json_extract(feature, '$.properties.contribuicao_id') = ?
+        """, (request_id, request_id), table="request_elements")
+        return [json.loads(row[0]) for row in rows]
+
+    def review_log(self, request_id=None):
+        sql = """
+            SELECT l.request_id, r.name, r.source, l.action, l.at, l.note
+            FROM photo_review_log AS l JOIN photo_requests AS r ON r.id = l.request_id
+        """
+        where = " WHERE l.request_id = ?" if request_id else ""
+        rows = self._read(
+            sql + where + " ORDER BY l.id DESC LIMIT 200", (request_id,) if request_id else (),
+            table="photo_review_log",
+        )
+        return [dict(row) for row in rows]
+
+    def review(self, request_id, decision, note):
+        if decision not in ("aprovado", "rejeitado"):
+            raise ValueError("Decisão inválida.")
+        reviewed_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            result = db.execute(
+                "UPDATE photo_requests SET status = ? WHERE id = ? AND status = 'pendente'",
+                (decision, request_id),
+            )
+            if not result.rowcount:
+                return False
+            if decision == "aprovado":
+                db.execute("""
+                    INSERT INTO elements (id, feature, crop)
+                    SELECT id, json_set(feature, '$.properties.estado', 'confirmado'), crop
+                    FROM request_elements WHERE request_id = ? ORDER BY rowid
+                """, (request_id,))
+                db.execute("DELETE FROM request_elements WHERE request_id = ?", (request_id,))
+            db.execute(
+                "INSERT INTO photo_review_log (request_id, action, at, note) VALUES (?, ?, ?, ?)",
+                (request_id, decision, reviewed_at, note.strip()),
+            )
+        return True
 
     def update(self, feature):
         with closing(sqlite3.connect(self.path)) as db, db:

@@ -59,7 +59,7 @@ from comum import DATA_DIR, limiares, limit_vram, perspective_view  # noqa: E402
 
 
 SAM_MODELOS = {t: f"facebook/sam2.1-hiera-{t}" for t in ("large", "base-plus", "small", "tiny")}   # Apache 2.0
-MODEL = SAM_MODELOS["large"]
+MODEL = SAM_MODELOS["small"]
 SIZE = 1024
 Image.MAX_IMAGE_PIXELS = None
 

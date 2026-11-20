@@ -87,7 +87,7 @@ dos recortes, a primeira corrida cria-a), `sfm/` (pontos 3D) e `viz/` (imagens).
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\imagens.py app        # recortes já desenhados (~30 s): data/app/
-.\.venv\Scripts\python.exe -m streamlit run apppp.py   # http://localhost:8501
+.\.venv\Scripts\python.exe -m streamlit run app\app.py   # http://localhost:8501
 ```
 
 - Lê `data/app/catalogo.geojson` (o catálogo + campo `imagem`); sem ele, `data/catalogo/catalogo.geojson`.
@@ -95,6 +95,7 @@ dos recortes, a primeira corrida cria-a), `sfm/` (pontos 3D) e `viz/` (imagens).
   (contentores com o contorno SAM 2, sinais com o desenho da DGV); nas ilhas, um por contentor.
 - Fotos enviadas na app: mesma cadeia da pipeline (`detetar.py` → `classificar.py` → `sinais.py`), caras e
   matrículas tapadas com o EgoBlur Gen2 (`comum.Desfocar`) e contorno com o SAM 2 small (cache do Hugging Face).
+- Fotos enviadas ficam **por rever**; na Administração aprovam-se (entram no mapa e nas exportações) ou rejeitam-se.
 - As edições feitas na app ficam em `data/app/catalogo.geojson` e `contribuicoes.sqlite3`: voltar a correr
   `imagens.py app` refaz o catálogo da app (as edições no GeoJSON perdem-se).
 - Token da Mapillary (importar fotos pelo ID) só no `.env` do servidor.

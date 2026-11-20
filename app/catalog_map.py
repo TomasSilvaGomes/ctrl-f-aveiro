@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import base64
-import html
 import io
 import json
 import re
@@ -16,10 +15,11 @@ from folium.template import Template
 from PIL import Image
 
 from contributions import PHOTO_CATEGORY
+from sign_icons import SIGN_CODES, sign_svg
 
 SIGNS = Path(__file__).resolve().parents[1] / "data" / "referencias" / "sinais"
 MAX_MAP_ZOOM = 22
-NATIVE_TILE_ZOOM = 19
+ICON_STYLES = Path(__file__).with_name("marker_icons.css").read_text(encoding="utf-8")
 CATEGORY_LABELS = {
     "sinalizacao": "Sinalização",
     "semaforos": "Semáforos",
@@ -28,18 +28,16 @@ CATEGORY_LABELS = {
     PHOTO_CATEGORY: "Fotografias",
 }
 CATEGORY_ICONS = {
-    "sinalizacao": ("⚠", "#8b332b"),
-    "semaforos": ("🚦", "#544117"),
-    "iluminacao": ("💡", "#145f58"),
-    "residuos": ("🗑", "#275885"),
-    PHOTO_CATEGORY: ("📷", "#475569"),
+    "semaforos": ("signal", "#f4eddf", "#59422a"),
+    "iluminacao": ("lamp", "#fff0c8", "#73501d"),
+    "residuos": ("bin", "#e8f6ed", "#287455"),
+    PHOTO_CATEGORY: ("camera", "#eee8fb", "#704dae"),
 }
-WASTE_ICONS = {
-    "ilha_reciclagem": ("♻", "#22684f"),
-    "ecoponto_papel": ("♻", "#275885"),
-    "ecoponto_embalagens": ("♻", "#f0c44d"),
-    "ecoponto_vidro": ("♻", "#28754e"),
-    "subterraneo": ("🗑", "#475569"),
+WASTE_COLORS = {
+    "ecoponto_papel": ("#e4eeff", "#375da3"),
+    "ecoponto_embalagens": ("#fff1c5", "#795615"),
+    "ecoponto_vidro": ("#e0f6e7", "#24654a"),
+    "subterraneo": ("#e8edf4", "#425875"),
 }
 CATEGORY_ACCENTS = {
     "sinalizacao": "#a63f46",
@@ -48,44 +46,55 @@ CATEGORY_ACCENTS = {
     "residuos": "#245ab1",
     PHOTO_CATEGORY: "#744bae",
 }
+LANTERN_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" focusable="false">'
+    '<path fill="#783c25" d="M11 1h2v2.6l6.4 5.2-1.1 1.4-2 7.9-2.6 1.5v1.6H16V23H8v-1.8h2.3v-1.6'
+    'l-2.6-1.5-2-7.9-1.1-1.4L11 3.6z"/>'
+    '<path fill="#ffd18f" d="M8.2 10.2h7.6l-1.4 6.3H9.6z"/>'
+    '<path fill="#783c25" d="M11.4 10h1.2v7h-1.2z"/>'
+    '</svg>'
+)
 
 MAP_STYLES = """
 <style>
   html, body {margin:0; overflow:hidden}
   #map_div {height:100vh !important; height:100dvh !important}
-  .leaflet-container {background:#e6edf0; font-family:system-ui,sans-serif}
-  .catalog-dark-tiles {filter:invert(1) hue-rotate(188deg) brightness(.96) contrast(.89)}
-  .leaflet-top.leaflet-left {top:auto; bottom:42px; left:auto; right:0}
+  .leaflet-container {background:#f8f5ed; font-family:system-ui,sans-serif}
+  .catalog-raster-tiles {filter:saturate(.65) contrast(.86) brightness(1.1)}
+  .leaflet-top.leaflet-left {top:auto; bottom:20px; left:auto; right:0}
   .leaflet-top.leaflet-left .leaflet-control {margin:0 18px 0 0}
-  .leaflet-top.leaflet-right .leaflet-control {margin:18px 18px 0 0}
-  .leaflet-bottom.leaflet-left .leaflet-control-scale {margin:0 0 24px 186px}
-  .leaflet-control-layers, .leaflet-bar {
+  .leaflet-bottom.leaflet-left .leaflet-control {margin-left:15px}
+  .leaflet-bottom.leaflet-left .leaflet-control-attribution {font-size:10px; border-radius:10px; margin-bottom:9px; padding:2px 6px}
+  .leaflet-bottom.leaflet-left .leaflet-control-scale {
+    padding:6px 8px; border-radius:10px; background:#fffffff2; margin-bottom:4px; box-shadow:0 3px 12px #25385020}
+  .leaflet-control-scale .leaflet-control-scale-line {
+    border:0; border-bottom:2px solid #253954; border-radius:0; background:transparent !important;
+    text-align:center; font:650 11px/1.05 system-ui,sans-serif; padding:0 0 4px}
+  .leaflet-bar {
     border:1px solid #fff !important; border-radius:17px !important; background:#fffefa;
     box-shadow:0 5px 21px #223a5330 !important; backdrop-filter:blur(14px)}
-  .leaflet-bar a, .leaflet-control-layers-toggle {
+  .leaflet-bar a {
     color:#223452 !important; background:#fffefa; width:39px !important; height:39px !important; line-height:39px !important}
   .leaflet-bar a:hover, .leaflet-bar a:focus-visible {background:#e7f1fc !important; color:#0b62d3 !important}
   .leaflet-bar a:first-child {border-radius:16px 16px 0 0 !important}
   .leaflet-bar a:last-child {border-radius:0 0 16px 16px !important}
   .leaflet-bar a + a {border-top:1px solid #e5ecf2}
-  .leaflet-control-layers-expanded {color:#253652; padding:9px 13px}
-  .leaflet-control-layers:not(.leaflet-control-layers-expanded), .leaflet-control-layers-toggle {border-radius:50% !important}
-  .leaflet-control-layers-toggle {background-image:none !important; text-align:center}
-  .leaflet-control-layers-toggle::after {content:'▤'; font-size:20px}
   .leaflet-control-attribution, .leaflet-control-scale-line {background:#ffffffdc !important; color:#223452 !important}
   .leaflet-control-attribution a {color:#0c57ac}
-  .leaflet-control-scale-line {border-color:#4e657f !important; text-shadow:none !important}
-  .catalog-pictogram {
-    display:grid; place-items:center; width:26px; height:26px; border-radius:9px;
-    background:var(--glyph-bg,#e9eef4); color:var(--glyph-color,#435673)}
-  .catalog-symbol {
-    font:18px/1 "Segoe UI Emoji","Apple Color Emoji",sans-serif;
-  }
+  .leaflet-control-scale-line {text-shadow:none !important}
+  .catalog-tooltip {font:650 12px system-ui,sans-serif; padding:5px 8px; border-radius:8px;
+    border-color:#fff; background:#fff; color:#23334e; box-shadow:0 5px 16px #25395430}
   .catalog-marker-glyph {
-    position:relative; display:grid; place-items:center; width:34px; height:34px;
-    border-radius:13px; border:1px solid #fff; box-sizing:border-box; background:#fff;
-    box-shadow:0 3px 11px #253e603e;
+    position:relative; display:grid; place-items:center; width:100%; height:100%;
+    border-radius:29%; border:1px solid #fff; box-sizing:border-box; background:#fff;
+    box-shadow:0 2px 9px #253e6037;
     transition:transform .18s ease,box-shadow .18s ease}
+  .catalog-marker-overview {--pictogram-size:20px}
+  .catalog-search-pin span {
+    position:absolute; inset:1px 4px 6px; border-radius:50% 50% 50% 0;
+    transform:rotate(-45deg); background:#176ed7; border:2px solid #fff; box-shadow:0 3px 9px #1755a75c}
+  .catalog-search-pin span::after {
+    position:absolute; content:""; inset:29%; border-radius:50%; background:#fff}
   .catalog-map-marker:hover .catalog-marker-glyph, .catalog-selected .catalog-marker-glyph {
     transform:translateY(-2px); box-shadow:0 0 0 3px #4d9afb,0 6px 15px #1e518f50}
   .catalog-marker-stack {box-shadow:3px -3px 0 #afc9e8,0 3px 11px #253e603e}
@@ -112,9 +121,23 @@ MAP_STYLES = """
   .catalog-choice button:hover {background:#d8ebff}
   .catalog-choice button:focus-visible {outline:2px solid #1675eb; outline-offset:2px}
   .catalog-choice button:disabled {opacity:.42; cursor:default}
+  @media (max-width:630px) {
+    .leaflet-control-attribution {font-size:10px !important; line-height:1.4}
+  }
   @media (prefers-reduced-motion:reduce) {.catalog-marker-glyph {transition:none}}
 </style>
 """
+
+class SimpleBasemap(MacroElement):
+    _template = Template("""
+        {% macro script(this, kwargs) %}
+        (function (map) {
+            {{ this.script }}
+        })({{ this._parent.get_name() }});
+        {% endmacro %}
+    """)
+    script = Path(__file__).with_name("basemap.js").read_text(encoding="utf-8")
+
 
 class CatalogPoints(MacroElement):
     _template = Template("""
@@ -145,7 +168,7 @@ class ViewportAction(MacroElement):
             const map = {{ this._parent._parent.get_name() }};
             const animate = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             {% if this.point %}
-            map.flyTo({{ this.point | tojson }}, 18, {animate, duration: 0.55});
+            map.flyTo({{ this.point | tojson }}, {{ this.zoom }}, {animate, duration: 0.55});
             {% elif this.bounds %}
             map.flyToBounds({{ this.bounds | tojson }}, {animate, maxZoom: 16, duration: 0.55, padding: [28, 28]});
             {% endif %}
@@ -153,11 +176,12 @@ class ViewportAction(MacroElement):
         {% endmacro %}
     """)
 
-    def __init__(self, revision, point=None, bounds=None):
+    def __init__(self, revision, point=None, bounds=None, zoom=18):
         super().__init__()
         self.revision = revision
         self.point = point
         self.bounds = bounds
+        self.zoom = zoom
 
 
 @lru_cache(maxsize=320)
@@ -174,33 +198,39 @@ def sign_image(code):
     return "data:image/png;base64," + base64.b64encode(data.getvalue()).decode("ascii")
 
 
-def marker_icon(properties):
+def icon_svg(drawing, inline):
+    if inline:
+        return drawing
+    encoded = base64.b64encode(drawing.encode("utf-8")).decode("ascii")
+    return f'<img src="data:image/svg+xml;base64,{encoded}" alt="">'
+
+
+def marker_icon(properties, *, inline_svg=True):
     category = properties.get("categoria")
     subtype = properties.get("subtipo")
-    code = str(properties.get("codigo") or "").removeprefix("PT:") if category == "sinalizacao" else ""
-    if code == "H1":
-        code = "H1a"
-    url = sign_image(code) if code else None
-    if url:
-        image = f'<img src="{url}" alt="" style="width:22px;height:22px;object-fit:contain">'
-        if code == "C13":
-            value = str(properties.get("valor") or "")
-            speed = value if re.fullmatch(r"[0-9]{1,3}", value) else "·"
-            image += (
-                '<span style="position:absolute;inset:5px;background:#fff9fa;color:#111;'
-                'border-radius:50%;display:grid;place-items:center;font:bold 8px Arial">'
-                f'{speed}</span>'
-            )
-            code += f"-{speed}"
-        return code, f'<span class="catalog-pictogram" style="position:relative;background:white">{image}</span>'
+    if category == "sinalizacao":
+        code = str(properties.get("codigo") or "").removeprefix("PT:")
+        known_subtype = SIGN_CODES.get(code)
+        official_drawing = sign_image(code) if code and not known_subtype else None
+        if official_drawing:
+            key, drawing = f"sign-{code}", f'<img src="{official_drawing}" alt="">'
+        else:
+            key, drawing = sign_svg(known_subtype or subtype, properties.get("valor"))
+            drawing = icon_svg(drawing, inline_svg)
+        return key, f'<span class="catalog-pictogram catalog-pictogram--sign">{drawing}</span>'
+    if category == "iluminacao" and subtype == "candeeiro":
+        return "iluminacao-candeeiro", (
+            '<span class="catalog-pictogram" style="--glyph-bg:#fae7d7">'
+            '<span class="catalog-symbol catalog-symbol--candeeiro" aria-hidden="true">'
+            f'{icon_svg(LANTERN_SVG, inline_svg)}</span></span>'
+        )
     category = category if category in CATEGORY_ICONS else ""
-    symbol, background = CATEGORY_ICONS.get(category, ("•", "#475569"))
+    symbol, background, color = CATEGORY_ICONS.get(category, ("generic", "#e8edf4", "#425875"))
     if category == "residuos":
-        symbol, background = WASTE_ICONS.get(subtype, (symbol, background))
-    color = "#32250b" if background == "#f0c44d" else "white"
+        background, color = WASTE_COLORS.get(subtype, (background, color))
     return f"{category}-{symbol}-{background}", (
         f'<span class="catalog-pictogram" style="--glyph-bg:{background};--glyph-color:{color}">'
-        f'<span aria-hidden="true" class="catalog-symbol">{symbol}</span></span>'
+        f'<span aria-hidden="true" class="catalog-symbol catalog-symbol--{symbol}"></span></span>'
     )
 
 
@@ -230,17 +260,12 @@ def build_map(bounds):
         location=origin,
         zoom_start=13,
         tiles=None,
-        control_scale=True,
+        attributionControl=False,
+        minZoom=1,
+        maxZoom=MAX_MAP_ZOOM,
     )
-    map_view.get_root().header.add_child(Element(MAP_STYLES), name="catalog-styles")
-    folium.TileLayer(
-        "OpenStreetMap", name="Mapa claro", max_zoom=MAX_MAP_ZOOM, max_native_zoom=NATIVE_TILE_ZOOM,
-    ).add_to(map_view)
-    folium.TileLayer(
-        "OpenStreetMap", name="Mapa escuro", show=False, class_name="catalog-dark-tiles",
-        max_zoom=MAX_MAP_ZOOM, max_native_zoom=NATIVE_TILE_ZOOM,
-    ).add_to(map_view)
-    folium.LayerControl(position="topright").add_to(map_view)
+    map_view.get_root().header.add_child(Element(f"{MAP_STYLES}<style>{ICON_STYLES}</style>"), name="catalog-styles")
+    SimpleBasemap().add_to(map_view)
     if bounds:
         map_view.fit_bounds(bounds, max_zoom=15, padding=(24, 24))
     return map_view
@@ -255,7 +280,7 @@ def marker_data(points):
             key, pictogram = marker_icon(props)
             icons.setdefault(key, pictogram)
             label = str(props.get("label") or props.get("subtipo") or "Elemento")
-            entries.append((props["id"], key, label, CATEGORY_ACCENTS.get(props.get("categoria"), "#4f647d")))
+            entries.append((props["id"], key, label))
         rows.append((latitude, longitude, entries))
     return rows, icons
 
@@ -264,10 +289,12 @@ def build_marker_layer(rows, icons, view_request=None, coordinates=None):
     group = folium.FeatureGroup(name="Elementos", control=False)
     CatalogPoints(rows, icons).add_to(group)
     if coordinates:
-        folium.CircleMarker(
-            coordinates, radius=8, color="#0868dc", weight=2,
-            fill=True, fill_color="#fff", fill_opacity=0.8,
-            interactive=False,
+        folium.Marker(
+            coordinates, interactive=False, keyboard=False,
+            icon=folium.DivIcon(
+                class_name="catalog-search-pin", icon_size=(32, 36), icon_anchor=(16, 31),
+                html='<span aria-hidden="true"></span>',
+            ),
         ).add_to(group)
     if view_request:
         ViewportAction(**view_request).add_to(group)

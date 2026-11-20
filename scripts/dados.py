@@ -1090,7 +1090,7 @@ def main_poses(argv=None):
 #
 #   OWLv2   google/owlv2-base-patch16-ensemble   Apache 2.0   encontra objetos
 #   SigLIP  google/siglip-so400m-patch14-384     Apache 2.0   tipo, limites de velocidade, código do sinal
-#   SAM 2   facebook/sam2.1-hiera-large          Apache 2.0   contorno do objeto
+#   SAM 2   facebook/sam2.1-hiera-small          Apache 2.0   contorno do objeto (pipeline e app)
 #   EgoBlur Gen2 (Meta, caras + matrículas)      Apache 2.0   download manual (projectaria.com) -> weights/
 #
 # Uso:
@@ -1100,7 +1100,7 @@ def main_poses(argv=None):
 MODELOS = {
     "owlv2": "google/owlv2-base-patch16-ensemble",
     "siglip": "google/siglip-so400m-patch14-384",
-    "sam2": "facebook/sam2.1-hiera-large",
+    "sam2": "facebook/sam2.1-hiera-small",
 }
 
 
