@@ -70,6 +70,7 @@ class Segmenter:
 
         self.torch = torch
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        # só o que já está no disco: a app nunca descarrega o SAM 2 (sem ele mostra a caixa da deteção)
         self.processor = Sam2Processor.from_pretrained(directory, local_files_only=True)
         self.model = Sam2Model.from_pretrained(directory, local_files_only=True).to(self.device).eval()
         self.lock = Lock()
@@ -97,13 +98,35 @@ def segmentation_directory():
     return SAM2_MODEL
 
 
-def prepare_masks(image, boxes):
+def sam_available():
+    """O SAM 2 small está neste computador (pasta local ou cache do Hugging Face)? Não descarrega nada.
+    Sem ele a app mostra a caixa da deteção; os recortes já feitos (data/app/) não precisam dele."""
     directory = segmentation_directory()
+    if Path(directory).is_dir():
+        return True
+    from huggingface_hub import try_to_load_from_cache
+
+    return all(
+        isinstance(try_to_load_from_cache(directory, name), str)
+        for name in ("config.json", "preprocessor_config.json", "model.safetensors")
+    )
+
+
+def prepare_masks(image, boxes):
+    """A causa real de cada falha fica no registo (terminal do streamlit)."""
+    directory = segmentation_directory()
+    if not sam_available():
+        raise SegmentationError("O SAM 2 small não está neste computador (python scripts/dados.py modelos --so sam2).")
     try:
         with MODEL_LOAD_LOCK:
             model = segmenter(directory)
-        return model.masks(image, boxes)
     except (OSError, RuntimeError, ImportError, ValueError) as error:
+        LOGGER.exception("Não foi possível carregar o SAM 2 (%s)", directory)
+        raise SegmentationError("Não foi possível carregar o SAM 2 small (causa no terminal).") from error
+    try:
+        return model.masks(image, boxes)
+    except (RuntimeError, ValueError) as error:
+        LOGGER.exception("O SAM 2 falhou a segmentar %d caixa(s)", len(boxes))
         raise SegmentationError("O SAM 2 não conseguiu gerar a máscara nesta tentativa.") from error
 
 
@@ -311,6 +334,8 @@ def _prepare_selected_preview(catalog_path, props, preview, token):
             if relative is None:
                 store_preview(catalog_path, props, preview)
                 return PreviewResult(preview)
+        if not sam_available():
+            return PreviewResult(preview)          # sem SAM 2 neste PC: fica a caixa da deteção, sem erro
 
         with Image.open(io.BytesIO(preview.image)) as image:
             box = [value * size for value, size in zip(preview.box, image.size * 2)]

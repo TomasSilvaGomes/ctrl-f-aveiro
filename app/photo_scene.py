@@ -12,7 +12,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from photo_preview import aligned_box, full_catalog_image, jpeg_bytes, normalised_box, prepare_masks
+from photo_preview import SegmentationError, aligned_box, full_catalog_image, jpeg_bytes, normalised_box, prepare_masks
 
 
 @dataclass(frozen=True)
@@ -80,12 +80,15 @@ def build_catalog_scene(catalog_path, image_id, detections, token, anonymize=Non
 
 
 def _segment_objects(photo, boxes):
+    """Máscara SAM 2 de cada caixa; sem SAM 2 (ou se falhar) ficam só as caixas com o nome."""
     for start in range(0, len(boxes), 6):
         batch = boxes[start:start + 6]
         pixels = [tuple(value * size for value, size in zip(box, photo.size * 2)) for _, box in batch]
-        yield from (
-            (label, box, mask) for (label, box), mask in zip(batch, prepare_masks(photo, pixels))
-        )
+        try:
+            masks = prepare_masks(photo, pixels)
+        except SegmentationError:
+            masks = [None] * len(batch)
+        yield from ((label, box, mask) for (label, box), mask in zip(batch, masks))
 
 
 def _segment_scene(photo, encoded, boxes):

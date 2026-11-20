@@ -34,7 +34,7 @@ from contributions import (
 from mapillary_photos import image_key, mapillary_token, photo_link
 from photo_preview import (
     SAM2_MODEL, PhotoPreview, PreviewQueue, SegmentationError, catalog_photo_views, has_catalog_preview,
-    load_catalog_preview,
+    load_catalog_preview, sam_available,
 )
 from photo_scene import build_catalog_scene, build_contribution_scene, classified_objects
 from place_search import find_place, place_suggestions
@@ -187,10 +187,10 @@ def finish_submission(results, revision):
     st.rerun()
 
 
-def submit_photo(digest, data, coordinates, location_source, *, name):
+def submit_photo(digest, data, coordinates, location_source, *, name, on_step=None):
     analyzer = get_analyzer()
     with decode_photo(data) as image:
-        detections = analyzer.analyze(image)
+        detections = analyzer.analyze(image, on_step=on_step)
         preview = None if detections else analyzer.preview_without_detections(image)
     return CONTRIBUTIONS.submit(
         digest, *coordinates, location_source, detections, name=name, source="ficheiro", preview=preview,
@@ -239,16 +239,27 @@ def render_upload():
         return
 
     results = []
-    progress = st.progress(0, text="A preparar a análise…")
+    total = len(ready)
+    progress = st.progress(0.0, text="A carregar os modelos de análise (na 1.ª vez, sem GPU, pode demorar 1–2 min)…")
+    try:
+        get_analyzer().warm_up()
+    except PrivacyModelsMissing as error:
+        finish_submission([("error", str(error))], revision)
+    except Exception:
+        LOGGER.exception("Erro ao carregar os modelos de análise")
+        finish_submission([("error", "Não foi possível carregar os modelos de análise (causa no terminal).")], revision)
     for index, (file, coordinates, location_source) in enumerate(ready):
-        progress.progress(index / len(ready), text=f"A analisar fotografia {index + 1} de {len(ready)}")
+        def on_step(fraction, text, index=index):
+            progress.progress((index + fraction) / total, text=f"Fotografia {index + 1} de {total} · {text}…")
+
+        on_step(0.0, "a ler")
         data = file.getvalue()
         digest = sha256(data).hexdigest()
         try:
             if CONTRIBUTIONS.has_photo(digest):
                 results.append(("info", f"{file.name} · Esta fotografia já foi enviada."))
                 continue
-            request_id = submit_photo(digest, data, coordinates, location_source, name=file.name)
+            request_id = submit_photo(digest, data, coordinates, location_source, name=file.name, on_step=on_step)
             if request_id:
                 results.append(("success", f"{file.name} · Fotografia recebida."))
             else:
@@ -262,6 +273,7 @@ def render_upload():
         except Exception:
             LOGGER.exception("Erro ao processar uma contribuição fotográfica")
             results.append(("error", f"{file.name} · Não foi possível analisar e enviar a fotografia."))
+    progress.progress(1.0, text="Concluído")
     finish_submission(results, revision)
 
 
@@ -425,6 +437,9 @@ def render_selected_photo(props, preview, *, token="") -> bool:
         render_photo(preview, props)
         if not preview.mask and props.get("imagem_bbox"):
             st.caption("A caixa da deteção não pôde ser alinhada com esta versão da fotografia.")
+        return False
+    if preview and not sam_available():
+        render_photo(preview, props)               # sem SAM 2 neste PC: foto com a caixa da deteção
         return False
 
     jobs = photo_jobs()

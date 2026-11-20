@@ -13,7 +13,7 @@ import torch
 from PIL import Image, ImageDraw
 
 from contributions import PrivacyModelsMissing
-from photo_preview import SAM2_MODEL, PhotoPreview, jpeg_bytes, normalised_box, prepare_masks
+from photo_preview import SAM2_MODEL, PhotoPreview, SegmentationError, jpeg_bytes, normalised_box, prepare_masks
 
 ROOT = Path(__file__).resolve().parents[1]   # raiz do projeto
 # A análise das fotos enviadas usa os MESMOS módulos da pipeline (scripts/), para dar o mesmo
@@ -89,16 +89,32 @@ class PhotoAnalyzer:
         crop.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
         return jpeg_bytes(crop)
 
-    def analyze(self, image, *, panoramic=False):
-        """Desfoca a foto inteira ANTES da deteção (como a pipeline) e cada imagem guardada outra vez."""
+    def warm_up(self):
+        """Carrega já o que a 1.ª análise carregaria a meio (EgoBlur, SigLIP, SAM 2), para a app poder
+        mostrar "a carregar os modelos" em vez de uma barra parada. Sem SAM 2 continua (só caixas)."""
+        privacy_model()
         with self.lock:
-            return self._analyze(anonymize(image), self._safe_jpeg, panoramic)
+            if self.classifier is None:
+                self.classifier = Classifier(self.taxonomy, self.device)
+        try:
+            prepare_masks(Image.new("RGB", (64, 64)), [(8, 8, 56, 56)])
+        except SegmentationError:
+            pass
+
+    def analyze(self, image, *, panoramic=False, on_step=None):
+        """Desfoca a foto inteira ANTES da deteção (como a pipeline) e cada imagem guardada outra vez.
+        on_step(fração 0-1, texto): progresso para a app."""
+        step = on_step or (lambda fraction, text: None)
+        with self.lock:
+            step(0.05, "a desfocar caras e matrículas")
+            return self._analyze(anonymize(image), self._safe_jpeg, panoramic, step)
 
     def preview_without_detections(self, image):
         with self.lock:
             return PhotoPreview(self._safe_jpeg(anonymize(image), max_size=960))
 
-    def _analyze(self, image, save_photo, panoramic):
+    def _analyze(self, image, save_photo, panoramic, step):
+        step(0.25, "a procurar mobiliário urbano")
         detections = []
         for pixels, view in prepare_views(image, panoramic=panoramic):
             (raw_detections,) = self.detector([pixels], threshold=0.20)
@@ -114,6 +130,7 @@ class PhotoAnalyzer:
         if self.classifier is None:
             self.classifier = Classifier(self.taxonomy, self.device)
 
+        step(0.5, f"a classificar {len(detections)} deteções")
         elements = []
         for start in range(0, len(detections), 8):
             batch = detections[start:start + 8]
@@ -149,12 +166,18 @@ class PhotoAnalyzer:
             return []
         photo = save_photo(image.copy(), max_size=960)
         boxes = [normalised_box(box, image.size) for _, _, box in elements]
+        step(0.8, "a contornar os objetos (SAM 2)")
+        model = SAM2_MODEL
         with Image.open(io.BytesIO(photo)) as preview:
-            masks = prepare_masks(preview, [
-                tuple(value * scale for value, scale in zip(box, preview.size * 2))
-                for box in boxes
-            ])
+            try:
+                masks = prepare_masks(preview, [
+                    tuple(value * scale for value, scale in zip(box, preview.size * 2))
+                    for box in boxes
+                ])
+            except SegmentationError:
+                # sem SAM 2 a foto segue na mesma, só com a caixa de cada deteção (a causa fica no registo)
+                masks, model = [None] * len(boxes), None
         return [
-            ({**properties, "segmentacao_modelo": SAM2_MODEL}, crop, PhotoPreview(photo, mask, box))
+            ({**properties, "segmentacao_modelo": model}, crop, PhotoPreview(photo, mask, box))
             for (properties, crop, _), mask, box in zip(elements, masks, boxes)
         ]

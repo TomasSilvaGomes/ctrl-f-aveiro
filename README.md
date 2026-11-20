@@ -17,6 +17,17 @@ estão em [config/taxonomia.yaml](config/taxonomia.yaml).
 
 ## 1. Instalar (Windows, PowerShell)
 
+Mais simples, um script que faz tudo (ambiente, bibliotecas com as versões de `versoes.txt`, modelos com o
+SAM 2.1 small, recortes da app) e, com a pasta de uma pen, copia o que não está no git
+(`weights/`, `data/app/`, `data/images/`, `.env`, `hf/`):
+
+```bash
+bash instalar_nvidia.sh [pasta_da_pen]   # PC com placa NVIDIA (Windows no Git Bash, ou Linux)
+bash instalar_macos.sh  [pasta_da_pen]   # Mac com chip Apple (análise de fotos novas no CPU)
+```
+
+À mão:
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
