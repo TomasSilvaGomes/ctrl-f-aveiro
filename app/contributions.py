@@ -118,6 +118,10 @@ class ContributionStore:
 
     def crop(self, element_id):
         rows = self._read("SELECT crop FROM elements WHERE id = ?", (element_id,))
+        if not rows:
+            rows = self._read(
+                "SELECT crop FROM request_elements WHERE id = ?", (element_id,), table="request_elements",
+            )
         return rows[0][0] if rows else None
 
     def preview(self, element_id, box=None):
@@ -129,7 +133,47 @@ class ContributionStore:
         return PhotoPreview(*rows[0], box=box) if rows else None
 
     def has_photo(self, digest):
-        return bool(self._read("SELECT 1 FROM photos WHERE digest = ?", (digest,), table="photos"))
+        if not self.path.exists():
+            return False
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            self._prepare_photo_links(db)
+            return db.execute("SELECT 1 FROM photos WHERE digest = ?", (digest,)).fetchone() is not None
+
+    def _prepare_photo_links(self, db):
+        columns = db.execute("PRAGMA table_info(photos)").fetchall()
+        if not columns:
+            db.execute("CREATE TABLE photos (digest TEXT PRIMARY KEY, request_id TEXT)")
+            return
+        if any(column[1] == "request_id" for column in columns):
+            return
+        db.execute("ALTER TABLE photos ADD COLUMN request_id TEXT")
+        if not db.execute("SELECT 1 FROM sqlite_master WHERE name = 'photo_requests'").fetchone():
+            return
+        # A versão anterior inseria o hash e o pedido juntos, pela mesma ordem.
+        unpaired = db.execute("""
+            SELECT EXISTS(SELECT rowid FROM photos EXCEPT SELECT rowid FROM photo_requests)
+                OR EXISTS(SELECT rowid FROM photo_requests EXCEPT SELECT rowid FROM photos)
+        """).fetchone()[0]
+        if unpaired:
+            return
+        db.execute("""
+            UPDATE photos SET request_id = (SELECT id FROM photo_requests WHERE rowid = photos.rowid)
+        """)
+        preview_table = db.execute("SELECT 1 FROM sqlite_master WHERE name = 'preview_photos'").fetchone()
+        keep_preview = (
+            "AND NOT EXISTS (SELECT 1 FROM preview_photos WHERE id = photos.request_id)"
+            if preview_table else ""
+        )
+        db.execute("""
+            DELETE FROM photos
+            WHERE request_id IN (SELECT id FROM photo_requests WHERE status = 'aprovado')
+            AND NOT EXISTS (
+                SELECT 1 FROM elements
+                WHERE json_extract(feature, '$.properties.contribuicao_id') = photos.request_id
+                AND COALESCE(json_extract(feature, '$.properties.sem_fotografia'), 0) = 0
+            )
+        """ + keep_preview)
 
     def submit(self, digest, latitude, longitude, location_source, detections, *, name, source, preview=None, credit=None):
         if not (math.isfinite(latitude) and -90 <= latitude <= 90
@@ -177,7 +221,6 @@ class ContributionStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with closing(sqlite3.connect(self.path)) as db, db:
             db.execute("BEGIN IMMEDIATE")
-            db.execute("CREATE TABLE IF NOT EXISTS photos (digest TEXT PRIMARY KEY)")
             db.execute(
                 "CREATE TABLE IF NOT EXISTS elements (id TEXT PRIMARY KEY, feature TEXT NOT NULL, crop BLOB)"
             )
@@ -200,7 +243,10 @@ class ContributionStore:
                     at TEXT NOT NULL, note TEXT NOT NULL
                 )
             """)
-            result = db.execute("INSERT OR IGNORE INTO photos VALUES (?)", (digest,))
+            self._prepare_photo_links(db)
+            result = db.execute(
+                "INSERT OR IGNORE INTO photos (digest, request_id) VALUES (?, ?)", (digest, upload_id),
+            )
             if not result.rowcount:
                 return None
             db.execute(
@@ -219,10 +265,11 @@ class ContributionStore:
             )
         return upload_id
 
-    def requests(self, status):
+    def requests(self, status=None):
+        where = " WHERE status = ?" if status is not None else ""
         rows = self._read(
-            "SELECT * FROM photo_requests WHERE status = ? ORDER BY submitted_at, rowid",
-            (status,), table="photo_requests",
+            "SELECT * FROM photo_requests" + where + " ORDER BY submitted_at DESC, rowid DESC",
+            (status,) if status is not None else (), table="photo_requests",
         )
         return [dict(row) for row in rows]
 
@@ -275,10 +322,45 @@ class ContributionStore:
             )
         return True
 
-    def update(self, feature):
+    def update(self, element_id, edit, *, remove_photo=False, remove_object=False):
         with closing(sqlite3.connect(self.path)) as db, db:
-            result = db.execute(
-                "UPDATE elements SET feature = ? WHERE id = ?",
-                (json.dumps(feature, ensure_ascii=False), feature["properties"]["id"]),
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT feature FROM elements WHERE id = ?", (element_id,)).fetchone()
+            if row is None:
+                return False
+            if remove_object or remove_photo:
+                item_ids = [element_id]
+                if remove_photo and (request_id := json.loads(row[0])["properties"].get("contribuicao_id")):
+                    item_ids = [
+                        item_id for (item_id,) in db.execute(
+                            "SELECT id FROM elements WHERE id = ? "
+                            "OR json_extract(feature, '$.properties.contribuicao_id') = ?",
+                            (element_id, request_id),
+                        )
+                    ]
+                db.executemany("DELETE FROM elements WHERE id = ?", ((item_id,) for item_id in item_ids))
+                for item_id in item_ids:
+                    self._remove_preview(db, item_id, keep_photo=remove_object)
+                if remove_photo and request_id:
+                    self._prepare_photo_links(db)
+                    db.execute("DELETE FROM photos WHERE request_id = ?", (request_id,))
+            else:
+                db.execute(
+                    "UPDATE elements SET feature = ? WHERE id = ?",
+                    (json.dumps(edit(json.loads(row[0])), ensure_ascii=False), element_id),
+                )
+        return True
+
+    def _remove_preview(self, db, element_id, *, keep_photo=False):
+        if not db.execute("SELECT 1 FROM sqlite_master WHERE name = 'preview_masks'").fetchone():
+            return
+        preview = db.execute("SELECT photo_id FROM preview_masks WHERE id = ?", (element_id,)).fetchone()
+        if preview is None:
+            return
+        db.execute("DELETE FROM preview_masks WHERE id = ?", (element_id,))
+        if not keep_photo:
+            db.execute(
+                "DELETE FROM preview_photos WHERE id = ? "
+                "AND NOT EXISTS (SELECT 1 FROM preview_masks WHERE photo_id = preview_photos.id)",
+                (preview[0],),
             )
-            return bool(result.rowcount)

@@ -124,7 +124,25 @@ MAP_STYLES = """
   @media (max-width:630px) {
     .leaflet-control-attribution {font-size:10px !important; line-height:1.4}
   }
-  @media (prefers-reduced-motion:reduce) {.catalog-marker-glyph {transition:none}}
+  @media (prefers-reduced-motion:no-preference) {
+    .catalog-choice-popup .leaflet-popup-content-wrapper,
+    .catalog-choice-popup .leaflet-popup-tip {
+      animation: catalog-choice-enter .2s ease-out;
+    }
+    @keyframes catalog-choice-enter {
+      from {opacity:0; translate:0 8px}
+      to {opacity:1; translate:0 0}
+    }
+  }
+  @media (prefers-reduced-motion:reduce) {
+    .catalog-marker-glyph {transition:none}
+    .catalog-choice-popup .leaflet-popup-content-wrapper,
+    .catalog-choice-popup .leaflet-popup-tip {animation:catalog-choice-fade .14s ease-out}
+    @keyframes catalog-choice-fade {
+      from {opacity:0}
+      to {opacity:1}
+    }
+  }
 </style>
 """
 
@@ -144,20 +162,28 @@ class CatalogPoints(MacroElement):
         {% macro script(this, kwargs) %}
         var {{ this.get_name() }} = (function () {
             const rows = {{ this.rows | tojson }};
-            const icons = {{ this.icons | tojson }};
+            let icons = {{ this.icons | tojson }};
+            const searchPin = {{ this.search_pin | tojson }};
             const map = {{ this._parent._parent.get_name() }};
+            if (map.catalogPoints) {
+                map.catalogPoints.update(rows, icons, searchPin);
+                return map.catalogPoints.layer;
+            }
             {{ this.interaction }}
-            layer.addTo({{ this._parent.get_name() }});
+            map.catalogPoints = {layer, update: updateCatalog};
+            layer.addTo(map);
+            updateCatalog(rows, icons, searchPin);
             return layer;
         })();
         {% endmacro %}
     """)
     interaction = Path(__file__).with_name("marker_menu.js").read_text(encoding="utf-8")
 
-    def __init__(self, rows, icons):
+    def __init__(self, rows, icons, search_pin=None):
         super().__init__()
         self.rows = rows
         self.icons = icons
+        self.search_pin = search_pin
 
 
 class ViewportAction(MacroElement):
@@ -285,17 +311,9 @@ def marker_data(points):
     return rows, icons
 
 
-def build_marker_layer(rows, icons, view_request=None, coordinates=None):
+def build_marker_layer(rows, icons, view_request=None, search_pin=None):
     group = folium.FeatureGroup(name="Elementos", control=False)
-    CatalogPoints(rows, icons).add_to(group)
-    if coordinates:
-        folium.Marker(
-            coordinates, interactive=False, keyboard=False,
-            icon=folium.DivIcon(
-                class_name="catalog-search-pin", icon_size=(32, 36), icon_anchor=(16, 31),
-                html='<span aria-hidden="true"></span>',
-            ),
-        ).add_to(group)
+    CatalogPoints(rows, icons, search_pin).add_to(group)
     if view_request:
         ViewportAction(**view_request).add_to(group)
     return group

@@ -2,15 +2,64 @@ const layer = L.layerGroup();
 const MIN_POINT_ZOOM = 13;
 const ICON_ZOOM = 17;
 const OVERVIEW_SPACING = 34;
-const points = rows.map(([lat, lng, data]) => ({
-    lat, lng, latlng: L.latLng(lat, lng),
-    entries: data.map(([id, icon, label]) => ({ id, icon, label })),
-})).sort((left, right) => left.lat - right.lat);
 const visible = new Map();
+let points = [];
+let pointIndex = new Map();
+let searchMarker = null;
+let searchRevision;
 let activePoint = null;
 let menu = null;
 let detailed = null;
 let frame = 0;
+
+function updateCatalog(nextRows, nextIcons, nextPin) {
+    const nextIndex = new Map();
+    const previousIcons = icons;
+    icons = nextIcons;
+    let changed = nextRows.length !== points.length;
+    for (const [lat, lng, data] of nextRows) {
+        const key = lat + ":" + lng;
+        const previous = pointIndex.get(key);
+        const unchanged = previous && previous.entries.length === data.length &&
+            data.every(([id, icon, label], index) => {
+                const entry = previous.entries[index];
+                return entry.id === id && entry.icon === icon && entry.label === label &&
+                    previousIcons[icon] === nextIcons[icon];
+            });
+        if (unchanged) {
+            nextIndex.set(key, previous);
+        } else {
+            changed = true;
+            const point = previous || {lat, lng, latlng: L.latLng(lat, lng)};
+            const priorEntries = point.entries;
+            point.entries = data.map(([id, icon, label]) => ({id, icon, label}));
+            nextIndex.set(key, point);
+            const marker = visible.get(point);
+            if (marker && priorEntries) {
+                const before = priorEntries[0];
+                const after = point.entries[0];
+                if (before.label !== after.label ||
+                    previousIcons[before.icon] !== nextIcons[after.icon] ||
+                    (priorEntries.length > 1) !== (point.entries.length > 1)) {
+                    marker.setIcon(pointIcon(point));
+                    marker.setTooltipContent(pointHint(point));
+                    const element = marker.getElement();
+                    if (element) element.setAttribute("aria-label", after.label);
+                }
+            }
+        }
+    }
+    if (changed) {
+        pointIndex = nextIndex;
+        points = [...pointIndex.values()].sort((left, right) => left.lat - right.lat);
+        if (activePoint && pointIndex.get(activePoint.lat + ":" + activePoint.lng) !== activePoint) {
+            activePoint = null;
+        }
+        if (menu && map.hasLayer(menu)) map.removeLayer(menu);
+        scheduleRefresh();
+    }
+    updateSearchPin(nextPin);
+}
 
 function pointsIn(bounds) {
     const south = bounds.getSouth();
@@ -33,6 +82,7 @@ function pointsIn(bounds) {
 }
 
 function selectEntry(point, entry) {
+    window.parent.postMessage({type: "catalog:close-filters"}, "*");
     map.closePopup();
     visible.get(activePoint)?.getElement?.()?.classList.remove("catalog-selected");
     activePoint = point;
@@ -42,6 +92,18 @@ function selectEntry(point, entry) {
     window.Streamlit.setComponentValue({
         catalog_selection: { id: entry.id, lat: point.lat, lng: point.lng, revision: window.catalogSelectionRevision }
     });
+}
+
+function dismissMenus() {
+    window.parent.postMessage({type: "catalog:close-filters"}, "*");
+    map.closePopup();
+    if (activePoint) {
+        visible.get(activePoint)?.getElement?.()?.classList.remove("catalog-selected");
+        activePoint = null;
+        scheduleRefresh();
+    }
+    window.catalogSelectionRevision = (window.catalogSelectionRevision || 0) + 1;
+    window.Streamlit.setComponentValue({catalog_dismiss: window.catalogSelectionRevision});
 }
 
 function choiceMenu(anchor, entries) {
@@ -122,22 +184,31 @@ function clickPoint(point) {
     else selectEntry(point, point.entries[0]);
 }
 
-function pointLayer(point) {
+function pointHint(point) {
+    const hint = document.createElement("span");
+    hint.textContent = point.entries[0].label;
+    return hint;
+}
+
+function pointIcon(point) {
     const first = point.entries[0];
     const size = detailed ? 34 : 26;
     const stack = point.entries.length > 1 ? " catalog-marker-stack" : "";
     const overview = detailed ? "" : " catalog-marker-overview";
-    const hint = document.createElement("span");
-    hint.textContent = first.label;
+    return L.divIcon({
+        className: "catalog-map-marker" + overview + (point === activePoint ? " catalog-selected" : ""),
+        html: '<div class="catalog-marker-glyph' + stack + '">' + icons[first.icon] + '</div>',
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+    });
+}
+
+function pointLayer(point) {
+    const size = detailed ? 34 : 26;
     return L.marker(point.latlng, {
-        alt: first.label,
-        icon: L.divIcon({
-            className: "catalog-map-marker" + overview + (point === activePoint ? " catalog-selected" : ""),
-            html: '<div class="catalog-marker-glyph' + stack + '">' + icons[first.icon] + '</div>',
-            iconSize: [size, size],
-            iconAnchor: [size / 2, size / 2],
-        }),
-    }).bindTooltip(hint, { direction: "top", offset: [0, -size / 2 - 2], opacity: 1, className: "catalog-tooltip" });
+        alt: point.entries[0].label,
+        icon: pointIcon(point),
+    }).bindTooltip(pointHint(point), { direction: "top", offset: [0, -size / 2 - 2], opacity: 1, className: "catalog-tooltip" });
 }
 
 function spreadIcons(candidates, zoom) {
@@ -186,12 +257,45 @@ function scheduleRefresh() {
     frame = requestAnimationFrame(refresh);
 }
 
+function updateSearchPin(pin) {
+    if (pin?.revision === searchRevision) return;
+    searchRevision = pin?.revision;
+    map.off("dragstart", hideSearchPin);
+    map.off("dragend", reportSearchPinDismissal);
+    searchMarker?.remove();
+    searchMarker = null;
+    if (!pin) return;
+    searchMarker = L.marker(pin.point, {
+        interactive: false,
+        keyboard: false,
+        icon: L.divIcon({
+            className: "catalog-search-pin",
+            iconSize: [32, 36],
+            iconAnchor: [16, 31],
+            html: '<span aria-hidden="true"></span>',
+        }),
+    }).addTo(map);
+    map.once("dragstart", hideSearchPin);
+}
+
+function hideSearchPin() {
+    searchMarker.remove();
+    map.once("dragend", reportSearchPinDismissal);
+}
+
+function reportSearchPinDismissal() {
+    window.Streamlit.setComponentValue({catalog_search_pin_dismissed: searchRevision});
+}
+
 layer.on("add", () => {
     map.on("moveend zoomend resize", scheduleRefresh);
+    map.on("click", dismissMenus);
     scheduleRefresh();
 });
 layer.on("remove", () => {
     map.off("moveend zoomend resize", scheduleRefresh);
+    map.off("click", dismissMenus);
+    updateSearchPin(null);
     cancelAnimationFrame(frame);
     layer.clearLayers();
     visible.clear();
