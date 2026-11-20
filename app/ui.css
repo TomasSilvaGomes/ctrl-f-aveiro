@@ -15,6 +15,7 @@
     --map-actions-bottom: 110px;
     --map-action-width: 41px;
     --map-action-height: 36px;
+    --intro-duration: 1.7s;
 }
 
 .stApp { background: var(--canvas); }
@@ -368,7 +369,7 @@ body:not(:has(.catalog-filter-toggle[open])) .st-key-hud_signals:not(.catalog-me
     line-height: 1.2;
 }
 
-.site-brand {
+.st-key-site_brand {
     display: flex;
     align-items: center;
     gap: .65rem;
@@ -382,21 +383,44 @@ body:not(:has(.catalog-filter-toggle[open])) .st-key-hud_signals:not(.catalog-me
     border-radius: 18px;
     font-family: var(--heading);
 }
-.site-brand__symbol {
-    display: grid;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    color: #ffffff;
-    background: var(--accent);
-    border-radius: 13px;
-    font-size: 1.65rem;
-    line-height: 1;
-    box-shadow: inset 0 1px 0 #ffffff55, 0 4px 10px #0868dc33;
+.st-key-site_brand [data-testid="stElementContainer"]:has([data-testid="stImage"]),
+.st-key-site_brand [data-testid="stImage"] {
+    width: 40px !important;
 }
-.site-brand__name, .site-brand__location { display: block; line-height: 1.12; }
-.site-brand__name { color: var(--white); font-size: 1.22rem; font-weight: 800; letter-spacing: -.065em; }
-.site-brand__location { color: #52657c; font-size: .8rem; font-weight: 600; margin-top: .14rem; }
+.st-key-site_brand [data-testid="stImage"] img {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #edf8f5;
+    border-radius: 11px;
+}
+.site-brand__name {
+    display: flex;
+    align-items: center;
+    gap: .075em;
+    color: #08263d;
+    font-size: 1.18rem;
+}
+.site-brand__letter { display: block; flex: none; height: 1em; background: currentColor; }
+.site-brand__letter--i { width: .34em; }
+.site-brand__letter--a {
+    width: 1.36em;
+    clip-path: polygon(evenodd, 0 100%, 39% 0, 60% 0, 100% 100%, 76% 100%, 68% 80%, 32% 80%,
+        24% 100%, 0 100%, 37% 60%, 49% 26%, 62% 60%, 37% 60%);
+}
+.site-brand__letter--m {
+    width: 1.48em;
+    clip-path: polygon(0 0, 23% 0, 50% 51%, 77% 0, 100% 0, 100% 100%, 79% 100%, 79% 37%,
+        55% 83%, 45% 83%, 21% 37%, 21% 100%, 0 100%);
+}
+.site-brand__letter--u {
+    box-sizing: border-box;
+    width: 1.18em;
+    border: .30em solid #0b968b;
+    border-top: 0;
+    border-radius: 0 0 52% 52% / 0 0 54% 54%;
+    background: transparent;
+}
 .site-brand__mode {
     padding: .26rem .46rem;
     margin-left: .15rem;
@@ -406,6 +430,103 @@ body:not(:has(.catalog-filter-toggle[open])) .st-key-hud_signals:not(.catalog-me
     font-size: .77rem;
     font-weight: 700;
 }
+
+.st-key-catalog_intro {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    width: 100vw !important;
+    height: 100dvh;
+    pointer-events: none;
+    --intro-size: 184px;
+    --intro-end-scale: .21739;
+    --intro-brand-center: calc(var(--hud-edge) + .42rem + 21px);
+}
+.catalog-intro__veil {
+    position: fixed;
+    inset: 0;
+    background: #fff;
+}
+.catalog-intro__veil::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: #08263d;
+}
+@keyframes intro-light {
+    0%, 58% { opacity: 1; }
+    100% { opacity: 0; }
+}
+.st-key-catalog_intro [data-testid="stImage"],
+.catalog-intro__pulse {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+}
+.st-key-catalog_intro [data-testid="stImage"] {
+    width: var(--intro-size) !important;
+}
+.st-key-catalog_intro [data-testid="stImage"] img {
+    display: block;
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 0 3px #ecf6ffb3);
+}
+.catalog-intro__pulse {
+    box-sizing: border-box;
+    width: calc(var(--intro-size) * .82);
+    aspect-ratio: 1;
+    border: 1px solid #079686;
+    border-radius: 50%;
+    opacity: 0;
+}
+@keyframes intro-flight {
+    0% { opacity: 0; transform: translateY(13px) scale(.91); }
+    24%, 54% { opacity: 1; transform: none; }
+    100% {
+        opacity: 1;
+        transform: translate(calc(var(--intro-brand-center) - 50vw), calc(var(--intro-brand-center) - 50dvh))
+            scale(var(--intro-end-scale));
+    }
+}
+@keyframes intro-pulse {
+    from { opacity: .62; transform: scale(.72); }
+    to { opacity: 0; transform: scale(2.25); }
+}
+@keyframes intro-reveal {
+    0%, 60% { opacity: 1; }
+    100% { opacity: 0; }
+}
+@keyframes intro-release {
+    from { visibility: visible; }
+    to { visibility: hidden; }
+}
+@keyframes intro-brand-ready {
+    0%, 85% { opacity: 0; }
+    100% { opacity: 1; }
+}
+@keyframes intro-reduced {
+    0%, 55% { opacity: 1; visibility: visible; }
+    100% { opacity: 0; visibility: hidden; }
+}
+@media (prefers-reduced-motion: no-preference) {
+    .st-key-catalog_intro { animation: intro-release var(--intro-duration) linear both; }
+    .st-key-catalog_intro [data-testid="stImage"] {
+        animation: intro-flight var(--intro-duration) cubic-bezier(.28,.68,.25,1) both;
+    }
+    .catalog-intro__veil { animation: intro-reveal var(--intro-duration) ease-in-out both; }
+    .catalog-intro__veil::before { animation: intro-light .9s ease-in-out both; }
+    .catalog-intro__pulse { animation: intro-pulse 1.08s .25s cubic-bezier(.16,.65,.33,1); }
+    .catalog-intro__pulse + .catalog-intro__pulse { animation-delay: .47s; }
+    body:has(.st-key-catalog_intro) .st-key-site_brand {
+        animation: intro-brand-ready var(--intro-duration) ease-out both;
+    }
+}
+@media (max-width: 630px) {
+    .st-key-catalog_intro { --intro-size: 156px; --intro-end-scale: .25641; }
+}
+
 .stApp :is(.st-key-hud_controls, .st-key-hud_map_actions) :is(button, .catalog-filter-toggle > summary) {
     min-height: 38px;
     padding: .31rem .63rem;
@@ -801,6 +922,8 @@ body:not(:has(.catalog-filter-toggle[open])) .st-key-hud_signals:not(.catalog-me
         animation: none !important;
         transition: none !important;
     }
+    .stApp .st-key-catalog_intro { animation: intro-reduced .65s ease-out both !important; }
+    .stApp .catalog-intro__veil::before { animation: intro-light .29s ease-out both !important; }
     .stApp .st-key-inspector,
     .stApp .st-key-hud_signals,
     [data-testid="stPopoverBody"],

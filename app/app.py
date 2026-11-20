@@ -42,6 +42,7 @@ from place_search import find_place, place_suggestions
 
 APP_DIR = Path(__file__).resolve().parent          # ficheiros da app (ui.css, marker_icons.css)
 MENU_MOTION_JS = (APP_DIR / "menu_motion.js").read_text(encoding="utf-8")
+LOGO_PATH = APP_DIR / "logo.png"
 ROOT = APP_DIR.parent                              # raiz do projeto (data/, config/)
 MUNICIPALITY = os.environ.get("CTRL_F_MUNICIPALITY", "Aveiro").strip() or "Aveiro"
 # Por omissão o catálogo para a app (scripts/imagens.py app): o mesmo catálogo + campo "imagem" com
@@ -74,7 +75,7 @@ CSV_COLUMNS = [
 ]
 
 st.set_page_config(
-    page_title=f"Ctrl+F {MUNICIPALITY} | Catálogo urbano",
+    page_title="IAMU",
     page_icon="📍",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -810,12 +811,32 @@ def glyph(category):
 
 def render_brand(admin):
     with st.container(key="hud_brand"):
-        mode = '<span class="site-brand__mode">Edição</span>' if admin else ""
+        with st.container(key="site_brand", horizontal=True, vertical_alignment="center", width="content", gap="small"):
+            st.image(str(LOGO_PATH), width="content")
+            st.html(
+                '<span class="site-brand__name" role="img" aria-label="IAMU">'
+                '<span class="site-brand__letter site-brand__letter--i" aria-hidden="true"></span>'
+                '<span class="site-brand__letter site-brand__letter--a" aria-hidden="true"></span>'
+                '<span class="site-brand__letter site-brand__letter--m" aria-hidden="true"></span>'
+                '<span class="site-brand__letter site-brand__letter--u" aria-hidden="true"></span></span>',
+
+                width="content",
+            )
+            if admin:
+                st.html('<span class="site-brand__mode">Edição</span>', width="content")
+
+
+def render_intro():
+    if st.session_state.get("catalog-intro-shown"):
+        return
+    st.session_state["catalog-intro-shown"] = True
+    with st.container(key="catalog_intro"):
         st.html(
-            '<div class="site-brand"><span class="site-brand__symbol" aria-hidden="true">⌖</span>'
-            '<div><span class="site-brand__name">Ctrl+F</span>'
-            f'<span class="site-brand__location">{html.escape(MUNICIPALITY)}</span></div>{mode}</div>'
+            '<div class="catalog-intro__veil" aria-hidden="true"></div>'
+            '<div class="catalog-intro__pulse" aria-hidden="true"></div>'
+            '<div class="catalog-intro__pulse" aria-hidden="true"></div>',
         )
+        st.image(str(LOGO_PATH), width="content")
 
 
 def render_navigation(admin):
@@ -1251,6 +1272,7 @@ def main() -> None:
     st.html(f"<script>{MENU_MOTION_JS}</script>", unsafe_allow_javascript=True)
     admin = st.session_state.get("catalog-admin-mode", False)
     render_brand(admin)
+    render_intro()
     try:
         features = load_catalog()
     except (OSError, json.JSONDecodeError, ValueError) as error:
