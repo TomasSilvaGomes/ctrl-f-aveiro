@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import math
 import sys
 from pathlib import Path
@@ -23,6 +24,29 @@ from classificar import Classifier, square_crop, suppress_contained  # noqa: E40
 from comum import Desfocar, load_taxonomy, nms_by_category  # noqa: E402
 from detetar import PROMPTS, Owlv2, prepare_views, to_original  # noqa: E402
 from sinais import SpeedReader  # noqa: E402
+from posicao import geometry, project  # noqa: E402
+
+# Posição de cada objeto numa foto enviada: o mesmo cálculo do posicao.py calcular, sem pontos 3D.
+H_CAMARA = 1.4          # m: telemóvel na mão (a pipeline usa 1,95 para os carros da Mapillary)
+H_CAMARA_360 = 2.0      # m: câmara 360° num bastão (= posicao.py --h-pano)
+H_LUMINARIA = {"poste_iluminacao": 8.7, "candeeiro": 4.4}   # = posicao.py --h-poste / --h-candeeiro
+DIST_MAX = 40           # m: mais longe numa só foto o erro passa os ~5 m (medido no catálogo)
+
+
+def locate(bbox, category, subtype, size, panoramic, camera):
+    """-> (lon, lat, distância, rumo, método) ou None (sem rumo no EXIF, ou distância fora de 1–40 m).
+    rumo = rumo da câmara + ângulo na imagem; distância = chão / largura do sinal / altura da luminária."""
+    if camera.get("heading") is None or camera.get("lat") is None:
+        return None
+    meta = {"is_pano": "True" if panoramic else "False", "thumb_w": size[0], "thumb_h": size[1],
+            "compass_angle": camera["heading"],
+            "camera_parameters": json.dumps([camera.get("focal35", 26.0) / 36.0])}   # focal relativa ao lado maior
+    g = geometry({"bbox": bbox, "category": category}, meta, H_CAMARA_360, H_CAMARA, None, H_LUMINARIA.get(subtype))
+    if not g or g[1] is None or not 1 <= g[1] <= DIST_MAX:
+        return None
+    bearing, distance, method = g
+    lon, lat = project(camera["lon"], camera["lat"], bearing, distance)
+    return lon, lat, distance, bearing, method
 
 _PRIVACY = None
 _PRIVACY_LOCK = Lock()
@@ -101,19 +125,20 @@ class PhotoAnalyzer:
         except SegmentationError:
             pass
 
-    def analyze(self, image, *, panoramic=False, on_step=None):
+    def analyze(self, image, *, panoramic=False, on_step=None, camera=None):
         """Desfoca a foto inteira ANTES da deteção (como a pipeline) e cada imagem guardada outra vez.
-        on_step(fração 0-1, texto): progresso para a app."""
+        on_step(fração 0-1, texto): progresso para a app. camera: {lat, lon, heading, focal35} para pôr cada
+        objeto à sua distância da câmara (sem heading ficam no local da foto)."""
         step = on_step or (lambda fraction, text: None)
         with self.lock:
             step(0.05, "a desfocar caras e matrículas")
-            return self._analyze(anonymize(image), self._safe_jpeg, panoramic, step)
+            return self._analyze(anonymize(image), self._safe_jpeg, panoramic, step, camera or {})
 
     def preview_without_detections(self, image):
         with self.lock:
             return PhotoPreview(self._safe_jpeg(anonymize(image), max_size=960))
 
-    def _analyze(self, image, save_photo, panoramic, step):
+    def _analyze(self, image, save_photo, panoramic, step, camera):
         step(0.25, "a procurar mobiliário urbano")
         detections = []
         for pixels, view in prepare_views(image, panoramic=panoramic):
@@ -177,7 +202,14 @@ class PhotoAnalyzer:
             except SegmentationError:
                 # sem SAM 2 a foto segue na mesma, só com a caixa de cada deteção (a causa fica no registo)
                 masks, model = [None] * len(boxes), None
-        return [
-            ({**properties, "segmentacao_modelo": model}, crop, PhotoPreview(photo, mask, box))
-            for (properties, crop, _), mask, box in zip(elements, masks, boxes)
-        ]
+        results = []
+        for (properties, crop, bbox), mask, box in zip(elements, masks, boxes):
+            spot = locate(bbox, properties["categoria"], properties["subtipo"], image.size, panoramic, camera)
+            if spot:
+                lon, lat, distance, bearing, method = spot
+                position = {"_lonlat": [round(lon, 7), round(lat, 7)], "distancia_m": round(distance, 1),
+                            "rumo": round(bearing, 1), "metodo_posicao": method}
+            else:
+                position = {"metodo_posicao": "local da foto"}
+            results.append(({**properties, **position, "segmentacao_modelo": model}, crop, PhotoPreview(photo, mask, box)))
+        return results

@@ -72,6 +72,24 @@ def photo_coordinates(data: bytes) -> tuple[float, float] | None:
     return lat, lon
 
 
+def photo_camera(data: bytes) -> dict:
+    """Para onde a câmara apontava (GPSImgDirection, graus) e focal equivalente a 35 mm, se o EXIF os tiver.
+    Sem o rumo não dá para pôr os objetos à distância certa: ficam no local da foto."""
+    camera = {}
+    with open_photo(data) as image:
+        try:
+            exif = image.getexif()
+            heading = exif.get_ifd(ExifTags.IFD.GPSInfo).get(17)
+            if heading is not None and math.isfinite(float(heading)):
+                camera["heading"] = float(heading) % 360
+            focal = exif.get_ifd(ExifTags.IFD.Exif).get(0xA405)
+            if focal and 8 <= float(focal) <= 300:
+                camera["focal35"] = float(focal)
+        except (ArithmeticError, AttributeError, OSError, TypeError, ValueError, SyntaxError):
+            pass
+    return camera
+
+
 def decode_photo(data: bytes) -> Image.Image:
     with open_photo(data) as image:
         try:
@@ -134,11 +152,12 @@ class ContributionStore:
             properties, crop = detection[:2]
             preview = detection[2] if len(detection) > 2 else None
             element_id = f"{upload_id}-{index}"
+            point = properties.get("_lonlat") or [longitude, latitude]   # posição calculada, ou o local da foto
             feature = {
                 "type": "Feature",
-                "geometry": {"type": "Point", "coordinates": [longitude, latitude]},
+                "geometry": {"type": "Point", "coordinates": point},
                 "properties": {
-                    **properties,
+                    **{key: value for key, value in properties.items() if key != "_lonlat"},
                     **(credit or {}),
                     "id": element_id,
                     "contribuicao_id": upload_id,

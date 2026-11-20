@@ -29,7 +29,7 @@ from catalog_map import (
 )
 from contributions import (
     MAX_UPLOAD_MB, PHOTO_CATEGORY, SOURCE, UPLOAD_TYPES, ContributionStore,
-    PrivacyModelsMissing, decode_photo, photo_coordinates,
+    PrivacyModelsMissing, decode_photo, photo_camera, photo_coordinates,
 )
 from mapillary_photos import image_key, mapillary_token, photo_link
 from photo_preview import (
@@ -189,8 +189,11 @@ def finish_submission(results, revision):
 
 def submit_photo(digest, data, coordinates, location_source, *, name, on_step=None):
     analyzer = get_analyzer()
+    # rumo e focal do EXIF: com eles cada objeto fica à sua distância da câmara (senão no local da foto)
+    camera = {**photo_camera(data), "lat": coordinates[0], "lon": coordinates[1]}
     with decode_photo(data) as image:
-        detections = analyzer.analyze(image, on_step=on_step)
+        panoramic = abs(image.width - 2 * image.height) <= 0.02 * image.height   # 360° equirretangular
+        detections = analyzer.analyze(image, panoramic=panoramic, on_step=on_step, camera=camera)
         preview = None if detections else analyzer.preview_without_detections(image)
     return CONTRIBUTIONS.submit(
         digest, *coordinates, location_source, detections, name=name, source="ficheiro", preview=preview,
@@ -370,10 +373,11 @@ def render_scene(scene, props):
         mask = base64.b64encode(scene.overlay).decode("ascii")
         overlay = f'<img class="scene-overlay" src="data:image/png;base64,{mask}" alt="">'
     objects = []
-    for label, (left, top, right, bottom) in scene.objects:
+    for label, (left, top, right, bottom), masked in scene.objects:
         label = html.escape(label, quote=True)
+        kind = "scene-object" if masked else "scene-object scene-object--caixa"   # sem máscara: caixa visível
         objects.append(
-            f'<span class="scene-object" tabindex="0" aria-label="{label}" style="left:{left:.2%};top:{top:.2%};'
+            f'<span class="{kind}" tabindex="0" aria-label="{label}" style="left:{left:.2%};top:{top:.2%};'
             f'width:{right - left:.2%};height:{bottom - top:.2%}"><span>{label}</span></span>'
         )
     st.html(
@@ -589,7 +593,11 @@ def render_details(feature: dict, admin=False) -> None:
         fields.append(("Estado", {"automatico": "Por rever", "confirmado": "Confirmado", "rejeitado": "Rejeitado"}.get(status, status)))
     if category != PHOTO_CATEGORY:
         fields.append(("Subtipo", subtype_label(category, props.get("subtipo") or "")))
-    metadata = "".join(f"<div><dt>{name}</dt><dd>{html.escape(str(value))}</dd></div>" for name, value in fields)
+    if props.get("metodo_posicao") == "local da foto":
+        fields.append(("Posição", "local da foto (sem direção da câmara no EXIF)"))
+    elif props.get("distancia_m") is not None:
+        fields.append(("Posição", f"a {props['distancia_m']:.0f} m da câmara"))
+    metadata ="".join(f"<div><dt>{name}</dt><dd>{html.escape(str(value))}</dd></div>" for name, value in fields)
     st.html(
         f'<dl class="item-meta">{metadata}<div class="item-meta__full"><dt>Coordenadas</dt>'
         f'<dd>{latitude:.6f}, {longitude:.6f}</dd></div></dl>'

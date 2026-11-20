@@ -542,6 +542,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
     box-shadow: 0 3px 12px #131e2b55;
     pointer-events: none;
 }
+.scene-object--caixa { outline: 2px solid rgba(92, 218, 255, .9); border-radius: 2px; }
 .scene-object:is(:hover, :focus-visible) { z-index: 2; outline: 1px solid #a8edff; }
 .scene-object:is(:hover, :focus-visible) span { visibility: visible; }
 
