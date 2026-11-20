@@ -94,6 +94,11 @@ class PhotoAnalyzer:
             save_photo = self._published_jpeg if already_anonymized else self._safe_jpeg
             return self._analyze(image, save_photo, panoramic)
 
+    def preview_without_detections(self, image, *, already_anonymized=False):
+        with self.lock:
+            save_photo = self._published_jpeg if already_anonymized else self._safe_jpeg
+            return PhotoPreview(save_photo(image.copy(), max_size=960))
+
     def _analyze(self, image, save_photo, panoramic):
         detections = []
         for pixels, view in prepare_views(image, panoramic=panoramic):

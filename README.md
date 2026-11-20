@@ -83,26 +83,28 @@ Instala as dependências do projeto na secção 1 e inicia o catálogo interativ
 ```
 
 O catálogo e o envio de fotografias estão disponíveis sem conta.
-O botão **Administração** abre diretamente o modo de edição. Quem tiver acesso à
-app pode corrigir a categoria, o subtipo, a designação, as coordenadas e o estado de
-um elemento.
-Os visitantes podem filtrar por categoria, subtipo, origem e confiança, pesquisar por
-ID, designação, código ou coordenadas e exportar os resultados em GeoJSON ou CSV.
-A pesquisa por latitude e longitude centra o mapa no ponto e ordena a lista por
-proximidade. Aceita, por exemplo, `40.6412, -8.6549` ou `40,6412; -8,6549`.
-O explorador mantém a posição do mapa ao mudar filtros e permite enquadrar os
-resultados, alternar entre as bases clara e escura ou saltar da lista para um ponto.
-O mapa ocupa todo o ecrã. Os botões sobrepostos abrem a pesquisa, os filtros, a lista
-e a exportação. O tema claro é a opção inicial. Ao longe, as categorias aparecem como
-pontos coloridos. Ao aproximar, aparecem os ícones, incluindo os pictogramas dos sinais.
-Quando os marcadores se sobrepõem, tocar nessa zona abre uma grelha de seleção.
+O botão **Administração** abre a fila de **Pedidos** e o separador **Registo**.
+Aprovar publica a fotografia e as respetivas deteções no mapa. O registo guarda a
+receção, a decisão, a hora e a nota. O estado dos elementos é visível em Administração.
+Quem tiver acesso à app pode abrir este modo e rever pedidos ou corrigir elementos.
 
-Em **Adicionar fotografias**, qualquer visitante pode enviar JPEG, PNG, WebP e HEIC
+A barra de pesquisa sugere localidades portuguesas à medida que escreves e centra o mapa
+na seleção. O índice inclui 16 610 entradas do [GeoNames](https://www.geonames.org/export/),
+sob a licença CC BY 4.0, e pode ser atualizado com `scripts/preparar_localidades.py PT.zip`.
+Os filtros de categoria e subtipo ficam junto à pesquisa. Enquadrar, exportar (GeoJSON
+ou CSV) e administração ficam por cima dos controlos de zoom.
+O mapa usa uma base simples com cor do OpenFreeMap. A partir do zoom 13, os elementos
+aparecem como ícones. Passar o rato mostra o nome. Tocar numa zona com ícones
+sobrepostos abre uma grelha de seleção.
+[OpenFreeMap](https://openfreemap.org/)
+
+Em **Adicionar fotos**, qualquer visitante pode enviar JPEG, PNG, WebP e HEIC
 até 25 MB por ficheiro. A app lê o GPS EXIF ou pede as coordenadas quando faltam.
-Ao carregar em **Analisar e publicar**, o OWLv2 encontra os objetos, o SigLIP
+Ao carregar em **Analisar e enviar**, o OWLv2 encontra os objetos, o SigLIP
 classifica cada recorte e o SAM 2 gera a máscara a partir da caixa de deteção.
-As deteções partilham a posição da captura. Se a análise não encontrar elementos,
-o mapa mostra um marcador de fotografia.
+As deteções partilham a posição da captura. Os ficheiros enviados e as importações
+do Mapillary entram na fila de pedidos. Uma fotografia aprovada sem deteções recebe
+um marcador de fotografia.
 
 Antes de publicar ficheiros enviados, a app cobre as regiões identificadas como rostos
 ou matrículas e guarda apenas os JPEG resultantes, sem os metadados do original.
@@ -122,11 +124,13 @@ Nos pontos do catálogo inicial, a app usa a deteção já calculada pelo OWLv2 
 classificada pelo SigLIP. Ao abrir uma vista com a fotografia disponível em
 `data/images` ou nos recortes de referência, o SAM 2 gera a máscara em segundo plano.
 A fotografia e a máscara ficam em `data/catalogo/previews/sam2` para as próximas
-aberturas. O seletor sobre a fotografia mostra ou esconde a máscara.
+aberturas. A máscara fica visível na ficha. **Imagem completa** abre a cena em ecrã
+inteiro com as máscaras das deteções dessa fotografia. O índice de deteções originais
+vem de `data/preds/owlv2_classified.jsonl`.
 
 Quando falta a fotografia local de uma deteção, a app tenta obter essa imagem pela
 API do Mapillary e segmentá-la com a caixa já guardada. Configura `MAPILLARY_TOKEN`
-no ficheiro `.env` do servidor para ativar esta opção. Em **Adicionar fotografias →
+no ficheiro `.env` do servidor para ativar esta opção. Em **Adicionar fotos →
 Mapillary**, cola o link ou ID de outra fotografia para a analisar com OWLv2, SigLIP e
 SAM 2. As deteções novas usam a posição da captura e a ficha inclui o crédito da
 fotografia. Esta opção usa as fotografias publicadas com o desfoque do Mapillary.
@@ -140,7 +144,9 @@ permite indicar outra pasta para os pesos.
 ```
 
 As contribuições novas guardam uma pré-visualização reduzida e anonimizada da cena.
-O botão **Ver no Mapillary** abre a fotografia de origem para consulta e atribuição.
+Os créditos da fotografia estão disponíveis no ícone ©. Os marcadores dos sinais
+usam pictogramas do subtipo classificado. O limite de velocidade usa o número
+identificado, quando disponível. O subtipo «outro» usa um sinal genérico.
 
 As contribuições e as suas correções ficam em `data/catalogo/contribuicoes.sqlite3`.
 As correções do catálogo inicial são guardadas no GeoJSON e no CSV.

@@ -163,7 +163,7 @@ def _sample_sizes(directory):
     return sizes
 
 
-def _aligned_box(catalog_path, props, size, *, remote=False):
+def aligned_box(catalog_path, props, size, *, remote=False):
     box = props.get("imagem_bbox")
     if not box or len(box) != 4:
         return None
@@ -200,8 +200,23 @@ def local_preview_image(catalog_path, props):
     with Image.open(path) as file:
         image = file.convert("RGB")
     if not reference:
-        box = _aligned_box(catalog_path, props, image.size)
+        box = aligned_box(catalog_path, props, image.size)
     return _frame_image(image, box, reference)
+
+
+def full_catalog_image(catalog_path, props, token=""):
+    path, _, reference = _local_image(catalog_path, props)
+    if path and not reference:
+        with Image.open(path) as source:
+            return source.convert("RGB"), False
+    key = image_key(props.get("imagem_id"))
+    if not key or not token:
+        raise ValueError("A fotografia completa ainda não está disponível.")
+    photo = fetch_photo(key, token)
+    with Image.open(io.BytesIO(photo.data), formats=("JPEG", "PNG", "WEBP")) as source:
+        if source.width * source.height > 16_000_000:
+            raise ValueError("A fotografia completa é demasiado grande.")
+        return source.convert("RGB"), True
 
 
 def _frame_image(image, box, reference=False):
@@ -286,7 +301,7 @@ def _prepare_selected_preview(catalog_path, props, preview, token):
             with Image.open(io.BytesIO(photo.data), formats=("JPEG", "PNG", "WEBP")) as source:
                 if source.width * source.height > 16_000_000:
                     raise MapillaryPhotoError("A fotografia devolvida pela API é demasiado grande.")
-                box = _aligned_box(catalog_path, props, source.size, remote=True)
+                box = aligned_box(catalog_path, props, source.size, remote=True)
                 image, box = _frame_image(source.convert("RGB"), box)
             relative = normalised_box(box, image.size) if box else None
             preview = PhotoPreview(jpeg_bytes(image), box=relative)

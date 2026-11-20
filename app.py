@@ -6,16 +6,17 @@ import html
 import io
 import json
 import logging
-import math
 import os
 import re
 import sqlite3
 import tempfile
-import unicodedata
 from collections import Counter
+from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
 from threading import Lock
+from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 import streamlit as st
 import yaml
@@ -35,6 +36,8 @@ from photo_preview import (
     SAM2_MODEL, PhotoPreview, PreviewQueue, SegmentationError, catalog_photo_views, has_catalog_preview,
     load_catalog_preview,
 )
+from photo_scene import build_catalog_scene, build_contribution_scene, classified_objects
+from place_search import find_place, place_suggestions
 
 
 ROOT = Path(__file__).resolve().parent
@@ -54,13 +57,10 @@ CATEGORY_GLYPHS = {
     "residuos": "recycling",
     PHOTO_CATEGORY: "photo_camera",
 }
-FILTER_KEYS = (
-    "catalog-categories", "catalog-subtypes", "catalog-source", "catalog-confidence", "catalog-search",
-)
-COORDINATE_FORMATS = (
-    re.compile(r"([+-]?\d+(?:\.\d+)?)\s*,\s*([+-]?\d+(?:\.\d+)?)"),
-    re.compile(r"([+-]?\d+(?:[.,]\d+)?)(?:\s*;\s*|\s+)([+-]?\d+(?:[.,]\d+)?)"),
-)
+SUBTYPE_FILTER_PREFIX = "catalog-subtype-"
+REVIEW_STATUS = {"pendente": "Por rever", "aprovado": "Aprovado", "rejeitado": "Rejeitado"}
+REVIEW_ACTIONS = {"submetido": "Recebido", **REVIEW_STATUS}
+REVIEW_SOURCES = {"ficheiro": "Ficheiro", "mapillary": "Mapillary"}
 CSV_COLUMNS = [
     "id", "categoria", "categoria_label", "subtipo", "label", "codigo", "valor",
     "lon", "lat", "confianca", "concordancia", "n_vistas", "n_imagens", "membros",
@@ -94,14 +94,14 @@ def load_catalog() -> list[dict]:
     return _read_catalog(CATALOG_PATH, stat.st_mtime_ns, stat.st_size)
 
 
-def csv_bytes(features: list[dict]) -> bytes:
-    fields = list(CSV_COLUMNS)
+def csv_bytes(features: list[dict], *, include_status=True) -> bytes:
+    fields = [name for name in CSV_COLUMNS if include_status or name != "estado"]
     extra_fields = sorted(
         {
             key
             for feature in features
             for key in feature.get("properties", {})
-            if key not in fields
+            if key not in fields and (include_status or key != "estado")
         }
     )
     output = io.StringIO(newline="")
@@ -172,37 +172,44 @@ def close_upload():
     st.session_state.pop("upload_errors", None)
 
 
-def finish_publication(published, results, revision):
+def finish_submission(results, revision):
     errors = [message for level, message in results if level == "error"]
     st.session_state["upload_errors"] = errors
     st.session_state["upload_messages"] = [(level, message) for level, message in results if level != "error"]
     st.session_state["upload_open"] = bool(errors)
     if not errors:
         st.session_state["upload_revision"] = revision + 1
-    if published:
-        st.session_state["new_contribution"] = published[0]
     st.rerun()
+
+
+def submit_photo(digest, data, coordinates, location_source, *, name, source, credit=None, panoramic=False):
+    mapillary = source == "mapillary"
+    analyzer = get_analyzer()
+    with decode_photo(data) as image:
+        detections = analyzer.analyze(image, already_anonymized=mapillary, panoramic=panoramic)
+        preview = None if detections else analyzer.preview_without_detections(image, already_anonymized=mapillary)
+    return CONTRIBUTIONS.submit(
+        digest, *coordinates, location_source, detections, name=name, source=source, preview=preview, credit=credit,
+    )
 
 
 def import_mapillary_photo(key, token):
     digest = f"mapillary:{key}"
     if CONTRIBUTIONS.has_photo(digest):
-        return None, ("info", "Esta fotografia do Mapillary já foi analisada.")
+        return "info", "Esta fotografia do Mapillary já foi recebida."
     photo = fetch_photo(key, token)
     if photo.coordinates is None:
         raise MapillaryPhotoError("A API não devolveu coordenadas para esta fotografia.")
-    with decode_photo(photo.data) as image:
-        detections = get_analyzer().analyze(image, already_anonymized=True, panoramic=photo.panoramic)
-    if not detections:
-        return None, ("info", "A análise não encontrou mobiliário urbano nesta fotografia.")
     credit = {
         "imagem_id": key, "imagem_url": photo_link(key), "autor": photo.author, "licenca": PHOTO_LICENSE,
     }
-    items = [({**props, **credit}, crop, preview) for props, crop, preview in detections]
-    upload_id = CONTRIBUTIONS.publish(digest, *photo.coordinates, "gps_mapillary", items)
-    if upload_id is None:
-        return None, ("info", "Esta fotografia do Mapillary já foi analisada.")
-    return (upload_id, photo.coordinates), ("success", f"Publicada no mapa ({len(items)} deteções).")
+    request_id = submit_photo(
+        digest, photo.data, photo.coordinates, "gps_mapillary",
+        name=f"Mapillary · {key}", source="mapillary", credit=credit, panoramic=photo.panoramic,
+    )
+    if request_id is None:
+        return "info", "Esta fotografia do Mapillary já foi recebida."
+    return "success", "Fotografia recebida."
 
 
 def render_mapillary_import(revision):
@@ -214,24 +221,24 @@ def render_mapillary_import(revision):
     if raw and not key:
         st.caption("Usa um ID numérico ou um link de fotografia com pKey.")
     if not st.button(
-        "Analisar e publicar do Mapillary", icon=":material/add_a_photo:", type="primary",
+        "Enviar fotografia do Mapillary", icon=":material/add_a_photo:", type="primary",
         width="stretch", disabled=not (token and key),
     ):
         return
     with st.spinner("A obter a fotografia e a executar OWLv2, SigLIP e SAM 2…"):
         try:
-            published, message = import_mapillary_photo(key, token)
-        except (SegmentationError, ValueError) as error:
-            published, message = None, ("error", str(error))
+            message = import_mapillary_photo(key, token)
+        except (PrivacyModelsMissing, SegmentationError, ValueError) as error:
+            message = ("error", str(error))
         except Exception:
             LOGGER.exception("Erro ao analisar uma fotografia do Mapillary")
-            published, message = None, ("error", "Não foi possível analisar e publicar a fotografia.")
-    finish_publication([published] if published else [], [message], revision)
+            message = ("error", "Não foi possível enviar a fotografia.")
+    finish_submission([message], revision)
 
 
 @st.dialog("Adicionar fotografias", width="large", on_dismiss=close_upload)
 def render_upload():
-    st.caption("O GPS da foto situa os elementos no mapa. A localização e os recortes anonimizados ficam públicos.")
+    st.caption("O GPS da foto situa os elementos no mapa. Os recortes são anonimizados antes de seguir para revisão.")
     for message in st.session_state.get("upload_errors", []):
         st.error(message)
     revision = st.session_state.get("upload_revision", 0)
@@ -269,12 +276,11 @@ def render_upload():
         if lat is not None and lon is not None:
             ready.append((file, (lat, lon), "manual"))
     if not st.button(
-        "Analisar e publicar", icon=":material/upload:", type="primary",
+        "Analisar e enviar", icon=":material/upload:", type="primary",
         disabled=not ready or len(ready) != len(files), width="stretch",
     ):
         return
 
-    published = []
     results = []
     progress = st.progress(0, text="A preparar a análise…")
     for index, (file, coordinates, location_source) in enumerate(ready):
@@ -285,13 +291,9 @@ def render_upload():
             if CONTRIBUTIONS.has_photo(digest):
                 results.append(("info", f"{file.name} · Esta fotografia já foi enviada."))
                 continue
-            with decode_photo(data) as image:
-                detections = get_analyzer().analyze(image)
-            upload_id = CONTRIBUTIONS.publish(digest, *coordinates, location_source, detections)
-            if upload_id:
-                published.append((upload_id, coordinates))
-                summary = f"{len(detections)} deteções" if detections else "sem elementos detetados"
-                results.append(("success", f"{file.name} · Publicada no mapa ({summary})."))
+            request_id = submit_photo(digest, data, coordinates, location_source, name=file.name, source="ficheiro")
+            if request_id:
+                results.append(("success", f"{file.name} · Fotografia recebida."))
             else:
                 results.append(("info", f"{file.name} · Esta fotografia já foi enviada."))
         except PrivacyModelsMissing as error:
@@ -302,36 +304,141 @@ def render_upload():
             results.append(("error", f"{file.name} · {error}"))
         except Exception:
             LOGGER.exception("Erro ao processar uma contribuição fotográfica")
-            results.append(("error", f"{file.name} · Não foi possível analisar e publicar a fotografia."))
-    finish_publication(published, results, revision)
+            results.append(("error", f"{file.name} · Não foi possível analisar e enviar a fotografia."))
+    finish_submission(results, revision)
 
 
-def render_photo(preview):
+def photo_credit(props):
+    key = image_key(props.get("imagem_id"))
+    if not key:
+        return ""
+    credit = ""
+    author = props.get("autor")
+    if author:
+        profile = quote(str(author), safe="")
+        credit = f' · <a href="https://www.mapillary.com/app/user/{profile}">{html.escape(str(author))}</a>'
+    return (
+        '<details class="photo-credit"><summary aria-label="Créditos da fotografia" title="Créditos da fotografia">©</summary>'
+        f'<p><a href="{photo_link(key)}">Origem da fotografia</a>{credit} · '
+        '<a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a> · Imagem adaptada</p></details>'
+    )
+
+
+def render_photo(preview, props):
     photo = base64.b64encode(preview.image).decode("ascii")
     with Image.open(io.BytesIO(preview.image)) as image:
         ratio = image.width / image.height
-    overlay = control = ""
+    overlay = ""
     if preview.mask:
         mask = base64.b64encode(preview.mask).decode("ascii")
         overlay = f'<img class="photo-overlay" src="data:image/png;base64,{mask}" alt="">'
-        label = "Segmentação SAM 2"
     elif preview.box:
         left, top, right, bottom = preview.box
         overlay = (
             f'<span class="photo-overlay photo-box" style="left:{left:.2%};top:{top:.2%};'
             f'width:{right - left:.2%};height:{bottom - top:.2%}" aria-hidden="true"></span>'
         )
-        label = "Área detetada"
-    if overlay:
-        control = (
-            '<figcaption><label class="photo-switch"><input type="checkbox" checked>'
-            f'<span>{label}</span></label></figcaption>'
-        )
     st.html(
         f'<figure class="photo-preview"><div class="photo-frame" style="--photo-ratio:{ratio:.5f}">'
         f'<img src="data:image/jpeg;base64,{photo}" alt="Fotografia do elemento selecionado">{overlay}'
-        f'</div>{control}</figure>'
+        f'{photo_credit(props)}</div></figure>'
     )
+
+
+@st.cache_data(show_spinner=False, max_entries=16, ttl=3600)
+def catalog_scene(image_id, detections, _token):
+    return build_catalog_scene(CATALOG_PATH, image_id, detections, _token)
+
+
+def catalog_scene_detections(photo):
+    image_id = str(photo["imagem_id"])
+    by_box = {
+        tuple(round(value) for value in item["bbox"]): item["label"]
+        for item in classified_objects(CATALOG_PATH, image_id) if item.get("label")
+    }
+    for feature in load_catalog():
+        props = feature["properties"]
+        for view in catalog_photo_views(props):
+            if str(view.get("imagem_id")) != image_id or not view.get("imagem_bbox"):
+                continue
+            key = tuple(round(value) for value in view["imagem_bbox"])
+            if props.get("estado") == "rejeitado":
+                by_box.pop(key, None)
+            else:
+                by_box[key] = feature_label(feature)
+    return tuple((label, box) for box, label in by_box.items())
+
+
+def contribution_scene(props):
+    contribution_id = props.get("contribuicao_id")
+    if contribution_id:
+        items = CONTRIBUTIONS.request_features(contribution_id) or [
+            feature for feature in CONTRIBUTIONS.features()
+            if feature["properties"].get("contribuicao_id") == contribution_id
+        ]
+    else:
+        items = [{"properties": props}]
+    previews = []
+    for feature in items:
+        item = feature["properties"]
+        if item.get("estado") == "rejeitado":
+            continue
+        preview = CONTRIBUTIONS.preview(item["id"], item.get("imagem_bbox_relativa"))
+        if preview:
+            if item.get("segmentacao_modelo") != SAM2_MODEL:
+                preview = PhotoPreview(preview.image, box=preview.box)
+            previews.append((feature_label(feature), preview))
+    return build_contribution_scene(previews)
+
+
+def render_scene(scene, props):
+    image = base64.b64encode(scene.image).decode("ascii")
+    ratio = scene.size[0] / scene.size[1]
+    overlay = ""
+    if scene.overlay:
+        mask = base64.b64encode(scene.overlay).decode("ascii")
+        overlay = f'<img class="scene-overlay" src="data:image/png;base64,{mask}" alt="">'
+    objects = []
+    for label, (left, top, right, bottom) in scene.objects:
+        label = html.escape(label, quote=True)
+        objects.append(
+            f'<span class="scene-object" tabindex="0" aria-label="{label}" style="left:{left:.2%};top:{top:.2%};'
+            f'width:{right - left:.2%};height:{bottom - top:.2%}"><span>{label}</span></span>'
+        )
+    st.html(
+        '<div class="scene-viewer"><div class="scene-viewport">'
+        f'<figure class="scene-frame" style="--scene-ratio:{ratio:.5f}">'
+        f'<img src="data:image/jpeg;base64,{image}" alt="Fotografia completa">{overlay}{"".join(objects)}'
+        f'{photo_credit(props)}</figure></div></div>'
+    )
+
+
+@st.dialog("Imagem completa", width="large")
+def render_scene_dialog(props):
+    with st.container(key="full_photo"):
+        try:
+            with st.spinner("A preparar a imagem completa…"):
+                if props.get("fonte") == SOURCE:
+                    scene = contribution_scene(props)
+                else:
+                    image_id = image_key(props.get("imagem_id"))
+                    if not image_id:
+                        raise ValueError("A fotografia completa ainda não está disponível.")
+                    scene = catalog_scene(image_id, catalog_scene_detections(props), mapillary_token())
+            render_scene(scene, props)
+        except (ValueError, SegmentationError) as error:
+            st.caption(str(error))
+        except (OSError, sqlite3.Error, Image.DecompressionBombError):
+            LOGGER.exception("Erro ao abrir a fotografia completa")
+            st.error("Não foi possível abrir a imagem completa.")
+
+
+def full_image_button(props, *, loading=False):
+    if st.button(
+        "Imagem completa", icon=":material/open_in_full:", key=f"full-image-{props['id']}",
+        width="stretch", disabled=loading,
+    ):
+        render_scene_dialog(props)
 
 
 @st.cache_resource
@@ -340,60 +447,48 @@ def photo_jobs():
 
 
 @st.fragment(run_every=0.5)
-def render_photo_progress(job, downloading):
+def render_photo_progress(job):
     if job.done():
         st.rerun()
-    if downloading:
-        st.caption("A obter a fotografia do Mapillary e a preparar a máscara…")
-    else:
-        st.caption("A gerar a máscara com o SAM 2…")
+    st.caption("A preparar a fotografia…")
 
 
-def render_selected_photo(props, preview, *, token=""):
+def render_selected_photo(props, preview, *, token="") -> bool:
     if preview is None and not token:
         if image_key(props.get("imagem_id")):
             st.caption("A fotografia falta em data/images. Configura MAPILLARY_TOKEN para a carregar pela API.")
         else:
             st.caption("A fotografia usada na deteção ainda não está disponível.")
-        return
+        return False
     if preview and (preview.mask or not preview.box):
-        render_photo(preview)
+        render_photo(preview, props)
         if not preview.mask and props.get("imagem_bbox"):
             st.caption("A caixa da deteção não pôde ser alinhada com esta versão da fotografia.")
-        return
+        return False
 
     jobs = photo_jobs()
     job = jobs.submit(CATALOG_PATH, props, preview, token=token)
     if job is None:
         if preview:
-            render_photo(preview)
+            render_photo(preview, props)
         st.info("Há várias fotografias em análise. Tenta novamente daqui a pouco.")
     elif not job.done():
         if preview:
-            render_photo(preview)
-        render_photo_progress(job, preview is None)
-        return
+            render_photo(preview, props)
+        render_photo_progress(job)
+        return True
     else:
         result = job.result()
         if result.preview:
-            render_photo(result.preview)
+            render_photo(result.preview, props)
         if not result.notice:
-            return
+            return False
         st.caption(result.notice)
 
     if st.button("Tentar novamente", icon=":material/refresh:", key=f"retry-photo-{props['id']}"):
         jobs.submit(CATALOG_PATH, props, preview, token=token, retry=True)
         st.rerun()
-
-
-def render_photo_source(photo):
-    if photo.get("autor"):
-        st.caption(f"Fotografia por {photo['autor']} · {photo.get('licenca') or PHOTO_LICENSE}")
-    key = image_key(photo.get("imagem_id"))
-    if key:
-        st.link_button("Ver no Mapillary", photo_link(key), icon=":material/photo_library:", width="stretch")
-    elif photo.get("imagem_url"):
-        st.link_button("Abrir fotografia", photo["imagem_url"], icon=":material/photo_library:", width="stretch")
+    return False
 
 
 def render_image(feature: dict) -> None:
@@ -405,12 +500,12 @@ def render_image(feature: dict) -> None:
             if preview and props.get("segmentacao_modelo") != SAM2_MODEL:
                 preview = PhotoPreview(preview.image, box=preview.box)
         if preview:
-            render_selected_photo(props, preview)
-            render_photo_source(props)
+            loading = render_selected_photo(props, preview)
+            full_image_button(props, loading=loading)
             return
         crop = CONTRIBUTIONS.crop(props["id"])
         if crop:
-            render_photo(PhotoPreview(crop))
+            render_photo(PhotoPreview(crop), props)
         else:
             st.caption("A análise desta fotografia não identificou elementos para recortar.")
         return
@@ -432,8 +527,9 @@ def render_image(feature: dict) -> None:
     except (OSError, ValueError, Image.DecompressionBombError):
         LOGGER.exception("Não foi possível abrir a fotografia local do catálogo")
         preview = None
-    render_selected_photo(photo, preview, token=token if image_key(photo.get("imagem_id")) else "")
-    render_photo_source(photo)
+    loading = render_selected_photo(photo, preview, token=token if image_key(photo.get("imagem_id")) else "")
+    if preview or (token and image_key(photo.get("imagem_id"))):
+        full_image_button(photo, loading=loading)
 
 
 @st.cache_data
@@ -446,13 +542,14 @@ def catalog_subtypes():
     }
 
 
-def render_details(feature: dict) -> None:
+def render_details(feature: dict, admin=False) -> None:
     props = feature.get("properties", {})
     longitude, latitude = feature["geometry"]["coordinates"][:2]
     category = props.get("categoria")
     status = props.get("estado", "automatico")
     color = CATEGORY_ACCENTS.get(category, "#c0ced8")
-    _, pictogram = marker_icon(props)
+    # O HTML da ficha aceita o SVG como fonte da imagem.
+    _, pictogram = marker_icon(props, inline_svg=False)
     label = html.escape(str(props.get("label") or props.get("subtipo") or "Elemento urbano"))
     category_name = html.escape(CATEGORY_LABELS.get(category, str(props.get("categoria_label") or category or "Elemento")))
     st.html(
@@ -469,9 +566,9 @@ def render_details(feature: dict) -> None:
             f'<div class="confidence__track" aria-hidden="true"><div class="confidence__value" '
             f'style="--confidence:{confidence}"></div></div></div>'
         )
-    fields = [
-        ("Estado", {"automatico": "Por rever", "confirmado": "Confirmado", "rejeitado": "Rejeitado"}.get(status, status)),
-    ]
+    fields = []
+    if admin:
+        fields.append(("Estado", {"automatico": "Por rever", "confirmado": "Confirmado", "rejeitado": "Rejeitado"}.get(status, status)))
     if category != PHOTO_CATEGORY:
         fields.append(("Subtipo", subtype_label(category, props.get("subtipo") or "")))
     metadata = "".join(f"<div><dt>{name}</dt><dd>{html.escape(str(value))}</dd></div>" for name, value in fields)
@@ -556,10 +653,6 @@ def subtype_label(category, subtype):
     return spec.get("label", subtype.replace("_", " ").capitalize()).replace(" {n} km/h", "")
 
 
-def format_total(value):
-    return f"{value:,}".replace(",", "\u202f")
-
-
 def category_label(category):
     return CATEGORY_LABELS.get(category, category.replace("_", " ").capitalize())
 
@@ -568,7 +661,7 @@ def glyph(category):
     return f":material/{CATEGORY_GLYPHS.get(category, 'location_on')}:"
 
 
-def render_navigation(admin):
+def render_brand(admin):
     with st.container(key="hud_brand"):
         mode = '<span class="site-brand__mode">Edição</span>' if admin else ""
         st.html(
@@ -576,58 +669,52 @@ def render_navigation(admin):
             '<div><span class="site-brand__name">Ctrl+F</span>'
             f'<span class="site-brand__location">{html.escape(MUNICIPALITY)}</span></div>{mode}</div>'
         )
-    with st.container(key="hud_actions"):
-        if st.button(
-            "Adicionar fotografias", icon=":material/add_a_photo:", type="primary", help="Adicionar fotografias",
-        ):
-            st.session_state["upload_open"] = True
-        label = "Voltar ao mapa" if admin else "Administração"
-        if st.button(
-            label, icon=":material/settings:", type="primary" if admin else "secondary", help=label,
-        ):
-            st.session_state["catalog-admin-mode"] = not admin
-            st.session_state["catalog-panel"] = "Ficha" if not admin else None
-            st.rerun()
 
 
-def clear_filters():
-    for key in FILTER_KEYS:
-        st.session_state.pop(key, None)
-    st.session_state["catalog-page"] = 0
+def render_navigation(admin):
+    if st.button("Adicionar fotos", key="map-upload", icon=":material/add_a_photo:", help="Adicionar fotografias"):
+        st.session_state["upload_open"] = True
+    if admin:
+        st.button(
+            "Pedidos", key="map-requests", icon=":material/inbox:", help="Rever pedidos de publicação",
+            type="primary" if st.session_state.get("catalog-panel") == "Administração" else "secondary",
+            on_click=toggle_panel, args=("Administração",),
+        )
 
 
-def normalized_search(value):
-    return "".join(
-        char for char in unicodedata.normalize("NFKD", value.casefold()) if not unicodedata.combining(char)
-    )
+def clear_filters(clear_search=False):
+    st.session_state["catalog-categories"] = []
+    for key in list(st.session_state):
+        if key == "catalog-pending" or key.startswith(SUBTYPE_FILTER_PREFIX):
+            st.session_state[key] = False
+    if clear_search:
+        for key in ("map-search", "submitted-map-search", "search-marker"):
+            st.session_state.pop(key, None)
 
 
-def parse_coordinates(text):
-    text = text.strip().removeprefix("(").removesuffix(")").strip()
-    for pattern in COORDINATE_FORMATS:
-        match = pattern.fullmatch(text)
-        if match is None:
-            continue
-        latitude, longitude = (float(value.replace(",", ".")) for value in match.groups())
-        if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
-            raise ValueError("Indica uma latitude entre -90 e 90 e uma longitude entre -180 e 180.")
-        return latitude, longitude
-    return None
+def toggle_filters():
+    st.session_state["catalog-filters-open"] = not st.session_state.get("catalog-filters-open", False)
 
 
-def sort_by_proximity(features, coordinates):
-    latitude, longitude = coordinates
-    longitude_scale = math.cos(math.radians(latitude))
+def render_search():
+    with st.container(key="hud_search", width="content"):
+        query = st.selectbox(
+            "Pesquisar localidades em Portugal", place_suggestions(), index=None,
+            label_visibility="collapsed", key="map-search", placeholder="Localidade",
+            icon=":material/search:", filter_mode="contains",
+        )
+        if query != st.session_state.get("submitted-map-search"):
+            st.session_state["submitted-map-search"] = query
+            st.session_state.pop("search-marker", None)
+            if query and (place := find_place(query)):
+                point, _ = place
+                st.session_state["search-marker"] = point
+                if st.session_state.get("catalog-panel") == "Ficha":
+                    st.session_state["catalog-panel"] = None
+                request_view(point=point, zoom=14)
 
-    def distance(feature):
-        point_longitude, point_latitude = feature["geometry"]["coordinates"][:2]
-        longitude_delta = (point_longitude - longitude + 180) % 360 - 180
-        return (point_latitude - latitude) ** 2 + (longitude_delta * longitude_scale) ** 2
 
-    features.sort(key=distance)
-
-
-def filter_catalog(available, categories, subtypes, source, confidence, search, pending_only):
+def filter_catalog(available, categories, subtypes, pending_only):
     matches = []
     for feature in available:
         props = feature["properties"]
@@ -636,21 +723,29 @@ def filter_catalog(available, categories, subtypes, source, confidence, search, 
             continue
         if subtypes and (category, props.get("subtipo")) not in subtypes:
             continue
-        if source and props.get("fonte") != source:
-            continue
-        if float(props.get("confianca") or 0) < confidence:
-            continue
         if pending_only and props.get("estado", "automatico") != "automatico":
             continue
-        if search:
-            searchable = " ".join(str(props.get(key) or "") for key in ("id", "label", "subtipo", "codigo"))
-            if search not in normalized_search(searchable):
-                continue
         matches.append(feature)
     return matches
 
 
-def render_toolbar(available, admin):
+def render_subtype_tiles(subtypes):
+    st.markdown("Subtipos")
+    selected = []
+    with st.container(key="subtype_grid"):
+        for category, subtype in subtypes:
+            option = f"{category}-{subtype}"
+            _, icon = marker_icon({"categoria": category, "subtipo": subtype}, inline_svg=False)
+            with st.container(key=f"subtype_tile_{option}"):
+                st.html(f'<span class="subtype-tile-icon" aria-hidden="true">{icon}</span>')
+                if st.checkbox(
+                    subtype_label(category, subtype), key=f"{SUBTYPE_FILTER_PREFIX}{option}", width="stretch", wrap=True,
+                ):
+                    selected.append((category, subtype))
+    return selected
+
+
+def render_filters(available, admin, filters_open):
     categories = list(dict.fromkeys(
         feature["properties"]["categoria"] for feature in available if feature["properties"].get("categoria")
     ))
@@ -660,102 +755,195 @@ def render_toolbar(available, admin):
         for feature in available
         if (props := feature["properties"]).get("categoria") and props.get("subtipo")
     })
-    sources = sorted({feature["properties"]["fonte"] for feature in available if feature["properties"].get("fonte")})
-    with st.container(key="hud_tools"):
-        with st.popover("Pesquisa", icon=":material/search:", help="Pesquisar no catálogo"):
-            st.subheader("Pesquisar")
-            search = st.text_input(
-                "Pesquisar no catálogo", placeholder="Nome, tipo ou coordenadas",
-                label_visibility="collapsed", key="catalog-search",
-            )
-            st.caption("Latitude e longitude, por exemplo 40.6412, -8.6549")
-            try:
-                coordinates = parse_coordinates(search)
-            except ValueError as error:
-                st.error(str(error))
-                coordinates = None
-        with st.popover("Filtros", icon=":material/tune:", help="Filtrar elementos"):
-            st.subheader("Filtros")
-            selected_categories = st.pills(
-                "Categorias no mapa", categories, selection_mode="multi",
-                format_func=lambda category: f"{glyph(category)} {category_label(category)}",
-                key="catalog-categories",
-            )
-            selected_subtypes = st.multiselect(
-                "Subtipos", subtypes, format_func=lambda value: subtype_label(*value), key="catalog-subtypes",
-            )
-            source = st.selectbox(
-                "Fonte", [None, *sources], format_func=lambda value: value or "Todas as fontes", key="catalog-source",
-            )
-            confidence = st.slider("Confiança mínima (%)", 0, 100, 0, 5, key="catalog-confidence") / 100
-            pending_only = admin and st.checkbox("Mostrar apenas por rever", value=True)
-            st.button("Limpar filtros", icon=":material/filter_alt_off:", on_click=clear_filters)
-    matches = filter_catalog(
-        available, selected_categories, selected_subtypes, source, confidence,
-        "" if coordinates else normalized_search(search.strip()), pending_only,
-    )
-    if coordinates:
-        sort_by_proximity(matches, coordinates)
-    return matches, coordinates
+    key = "hud_filters" if filters_open else "hud_filters_hidden"
+    with st.container(key=key):
+        selected_categories = st.pills(
+            "Categorias no mapa", categories, selection_mode="multi",
+            format_func=lambda category: f"{glyph(category)} {category_label(category)}",
+            key="catalog-categories",
+        )
+        selected_subtypes = render_subtype_tiles(subtypes)
+        pending_only = admin and st.checkbox("Mostrar apenas por rever", key="catalog-pending")
+        st.button("Limpar filtros", icon=":material/filter_alt_off:", on_click=clear_filters)
+    return filter_catalog(available, selected_categories, selected_subtypes, pending_only)
 
 
-def render_downloads(features):
+def render_downloads(features, admin):
     filename = f"catalogo_{re.sub(r'[^a-zA-Z0-9_-]+', '_', MUNICIPALITY.lower())}"
+    export = features if admin else [
+        {**feature, "properties": {key: value for key, value in feature["properties"].items() if key != "estado"}}
+        for feature in features
+    ]
     st.download_button(
         "Descarregar GeoJSON",
-        data=json.dumps({"type": "FeatureCollection", "features": features}, ensure_ascii=False).encode("utf-8"),
+        data=json.dumps({"type": "FeatureCollection", "features": export}, ensure_ascii=False).encode("utf-8"),
         file_name=f"{filename}.geojson", mime="application/geo+json", width="stretch", on_click="ignore",
     )
     st.download_button(
-        "Descarregar CSV", data=csv_bytes(features), file_name=f"{filename}.csv", mime="text/csv",
+        "Descarregar CSV", data=csv_bytes(features, include_status=admin), file_name=f"{filename}.csv", mime="text/csv",
         width="stretch", on_click="ignore",
     )
 
 
-def request_view(*, point=None, bounds=None):
+def request_view(*, point=None, bounds=None, zoom=18):
     revision = st.session_state.get("map-view-request", {}).get("revision", 0)
-    st.session_state["map-view-request"] = {"revision": revision + 1, "point": point, "bounds": bounds}
+    st.session_state["map-view-request"] = {"revision": revision + 1, "point": point, "bounds": bounds, "zoom": zoom}
 
 
-def select_element(feature_id, point, move_map=False):
+def select_element(feature_id, point):
     st.session_state.update({"map-point": point, "selected-id": feature_id, "catalog-panel": "Ficha"})
-    if move_map:
-        request_view(point=point)
-
-
-def change_page(delta):
-    st.session_state["catalog-page"] = st.session_state.get("catalog-page", 0) + delta
-
-
-def render_result_list(filtered):
-    page_size = 6
-    last_page = (len(filtered) - 1) // page_size
-    page = min(last_page, max(0, st.session_state.get("catalog-page", 0)))
-    st.session_state["catalog-page"] = page
-    with st.container(key="result_list"):
-        for feature in filtered[page * page_size:(page + 1) * page_size]:
-            props = feature["properties"]
-            element_id = props["id"]
-            longitude, latitude = feature["geometry"]["coordinates"][:2]
-            st.button(
-                feature_label(feature), icon=glyph(props.get("categoria")),
-                key=f"result-{element_id}", on_click=select_element, args=(element_id, (latitude, longitude), True),
-            )
-    if last_page:
-        previous, indicator, following = st.columns([1, 0.9, 1])
-        with previous:
-            st.button("Anterior", disabled=page == 0, on_click=change_page, args=(-1,), width="stretch")
-        with indicator:
-            st.html(f'<div class="page-number">{page + 1} / {last_page + 1}</div>')
-        with following:
-            st.button("Seguinte", disabled=page == last_page, on_click=change_page, args=(1,), width="stretch")
 
 
 def toggle_panel(name):
     st.session_state["catalog-panel"] = None if st.session_state.get("catalog-panel") == name else name
 
 
-def render_panel(panel, filtered, points, admin, features, coordinates):
+def render_view_controls(points, filtered, admin):
+    with st.container(key="hud_map_actions"):
+        st.button(
+            "Enquadrar", key="map-fit", icon=":material/my_location:", help="Enquadrar elementos", disabled=not points,
+            on_click=request_view, kwargs={"bounds": point_bounds(points)},
+        )
+        export_menu = st.popover(
+            "Exportar", key="map-export", icon=":material/download:", help="Exportar elementos", disabled=not points,
+            width=41, wrap=False, on_change="rerun",
+        )
+        if export_menu.open:
+            with export_menu, st.container(key="hud_export_menu"):
+                render_downloads(filtered, admin)
+                st.html(
+                    """<script>
+                    if (!window.catalogExportDismissInstalled) {
+                        window.catalogExportDismissInstalled = true;
+                        window.addEventListener("blur", () => requestAnimationFrame(() => {
+                            if (document.activeElement?.matches(".st-key-map_surface iframe")) {
+                                document.querySelector(".st-key-map-export button[aria-expanded='true']")?.click();
+                            }
+                        }));
+                    }
+                    </script>""",
+                    unsafe_allow_javascript=True,
+                )
+        label = "Voltar ao mapa" if admin else "Administração"
+        if st.button(label, key="map-admin", icon=":material/settings:", help=label):
+            st.session_state["catalog-admin-mode"] = not admin
+            st.session_state["catalog-panel"] = "Administração" if not admin else None
+            st.rerun()
+
+
+def render_map_legend(features):
+    with st.container(key="hud_legend"):
+        legend = st.expander("Legenda", icon=":material/legend_toggle:", key="map-legend", on_change="rerun")
+        if not legend.open:
+            return
+        if not features:
+            legend.caption("Sem elementos para os filtros atuais.")
+            return
+
+        groups = {}
+        for feature in features:
+            props = feature["properties"]
+            category = props.get("categoria") or "outros"
+            groups.setdefault(category, set()).add(props.get("subtipo") or "")
+
+        sections = []
+        for category in sorted(groups, key=category_label):
+            heading = category_label(category)
+            subtypes = sorted(groups[category], key=lambda subtype: subtype_label(category, subtype))
+            entries = []
+            for subtype in subtypes:
+                label = subtype_label(category, subtype) if subtype else heading
+                _, icon = marker_icon({"categoria": category, "subtipo": subtype}, inline_svg=False)
+                entries.append(
+                    f'<li><span aria-hidden="true">{icon}</span><span>{html.escape(label)}</span></li>'
+                )
+            sections.append(
+                f'<section class="map-legend__group"><h3>{html.escape(heading)}</h3>'
+                f'<ul>{"".join(entries)}</ul></section>'
+            )
+        legend.html(f'<div class="map-legend__content">{"".join(sections)}</div>')
+
+
+def review_time(value):
+    local = datetime.fromisoformat(value).astimezone(ZoneInfo("Europe/Lisbon"))
+    return local.strftime("%d/%m/%Y · %H:%M:%S")
+
+
+def render_review_log(request_id=None):
+    events = CONTRIBUTIONS.review_log(request_id)
+    if not events:
+        st.caption("Ainda não há registos.")
+        return
+    rows = []
+    for event in events:
+        row = {"Data": review_time(event["at"]), "Ação": REVIEW_ACTIONS[event["action"]]}
+        if request_id is None:
+            row.update({"Pedido": event["name"], "Referência": event["request_id"], "Origem": REVIEW_SOURCES[event["source"]]})
+        row["Nota"] = event["note"]
+        rows.append(row)
+    st.dataframe(rows, hide_index=True, width="stretch", height=min(300, 38 + len(rows) * 35))
+
+
+def render_review_request(request):
+    request_id = request["id"]
+    count = request["detection_count"]
+    detections = f"{count} {'deteção' if count == 1 else 'deteções'}"
+    st.caption(f"{REVIEW_SOURCES[request['source']]} · {detections} · {review_time(request['submitted_at'])}")
+    st.caption(f"{request['latitude']:.6f}, {request['longitude']:.6f}")
+    items = CONTRIBUTIONS.request_features(request_id)
+    if items:
+        index = 0
+        if len(items) > 1:
+            index = st.selectbox(
+                "Deteção a rever", range(len(items)), key=f"review-detection-{request_id}",
+                format_func=lambda index: feature_label(items[index]),
+            )
+        st.text(feature_label(items[index]))
+        render_image(items[index])
+    if request["status"] == "pendente":
+        note = st.text_input("Nota da decisão (opcional)", max_chars=300, key=f"review-note-{request_id}")
+        approve, reject = st.columns(2)
+        with approve:
+            approved = st.button("Aprovar e publicar", icon=":material/check:", type="primary", width="stretch")
+        with reject:
+            rejected = st.button("Rejeitar", icon=":material/close:", width="stretch")
+        if approved or rejected:
+            updated = CONTRIBUTIONS.review(request_id, "aprovado" if approved else "rejeitado", note)
+            if updated:
+                message = "Pedido aprovado e publicado no mapa." if approved else "Pedido rejeitado."
+                st.session_state["review_notice"] = ("success", message)
+            else:
+                st.session_state["review_notice"] = ("info", "Este pedido já foi avaliado.")
+            st.rerun()
+    with st.expander("Histórico do pedido"):
+        render_review_log(request_id)
+
+
+def render_admin():
+    with st.container(key="admin_workspace"):
+        if notice := st.session_state.pop("review_notice", None):
+            getattr(st, notice[0])(notice[1])
+        queue, log = st.tabs(["Pedidos", "Registo"])
+        with queue:
+            st.caption(f"{CONTRIBUTIONS.pending_count()} por rever")
+            status = st.radio(
+                "Estado dos pedidos", list(REVIEW_STATUS), format_func=REVIEW_STATUS.__getitem__,
+                horizontal=True, label_visibility="collapsed", key="review-status",
+            )
+            requests = CONTRIBUTIONS.requests(status)
+            if requests:
+                request = st.selectbox(
+                    "Pedido", requests, key=f"review-request-{status}",
+                    format_func=lambda request: f"{request['name']} · {request['id']}",
+                )
+                render_review_request(request)
+            else:
+                st.caption("Sem pedidos neste estado.")
+        with log:
+            render_review_log()
+
+
+def render_panel(panel, filtered, points, admin, features):
     with st.container(key="inspector"):
         title, close = st.columns([6, 1], vertical_alignment="center")
         with title:
@@ -763,19 +951,19 @@ def render_panel(panel, filtered, points, admin, features, coordinates):
         with close, st.container(key="hud_close"):
             st.button("Fechar painel", icon=":material/close:", help="Fechar painel", on_click=toggle_panel, args=(panel,))
 
-        if panel == "Exportar":
-            render_downloads(filtered)
+        if panel == "Administração" and admin:
+            try:
+                render_admin()
+            except (OSError, sqlite3.Error, ValueError):
+                LOGGER.exception("Erro ao consultar ou rever pedidos de publicação")
+                st.error("Não foi possível abrir ou atualizar os pedidos.")
             return
         if not filtered:
             st.write("Nenhum elemento corresponde aos filtros.")
-            if st.button("Limpar filtros e pesquisa", icon=":material/filter_alt_off:"):
-                clear_filters()
-                st.rerun()
-            return
-        if panel == "Resultados":
-            if coordinates:
-                st.caption(f"Por proximidade a {coordinates[0]:.6f}, {coordinates[1]:.6f}")
-            render_result_list(filtered)
+            st.button(
+                "Limpar filtros e pesquisa", icon=":material/filter_alt_off:",
+                on_click=clear_filters, kwargs={"clear_search": True},
+            )
             return
 
         at_point = points.get(st.session_state.get("map-point"))
@@ -785,7 +973,7 @@ def render_panel(panel, filtered, points, admin, features, coordinates):
         if selected is None:
             selected = alternatives[0] if at_point or admin else None
         if selected is None:
-            st.write("Seleciona um marcador ou abre a lista de resultados.")
+            st.write("Seleciona um marcador no mapa.")
             return
         if at_point and len(at_point) > 1:
             labels = [feature_label(item) for item in at_point]
@@ -798,7 +986,7 @@ def render_panel(panel, filtered, points, admin, features, coordinates):
             )
             selected = at_point[index]
         longitude, latitude = selected["geometry"]["coordinates"][:2]
-        render_details(selected)
+        render_details(selected, admin)
         st.button(
             "Localizar no mapa", icon=":material/location_searching:", width="stretch",
             on_click=request_view, kwargs={"point": (latitude, longitude)},
@@ -826,33 +1014,15 @@ def render_explorer(filtered, points, layer, map_bounds, admin, features, coordi
         st.session_state["map-last-click"] = selected
 
     panel = st.session_state.get("catalog-panel")
-    with st.container(key="hud_view"):
-        st.button(
-            "Resultados", icon=":material/view_list:", help="Ver resultados",
-            type="primary" if panel == "Resultados" else "secondary",
-            on_click=toggle_panel, args=("Resultados",),
-        )
-        st.button(
-            "Enquadrar", icon=":material/my_location:", help="Enquadrar resultados", disabled=not points,
-            on_click=request_view, kwargs={"bounds": point_bounds(points)},
-        )
-        st.button(
-            "Exportar", icon=":material/download:", help="Exportar resultados", disabled=not filtered,
-            type="primary" if panel == "Exportar" else "secondary",
-            on_click=toggle_panel, args=("Exportar",),
-        )
-    with st.container(key="hud_status"):
-        count = format_total(len(filtered))
-        text = f'{count} {"resultado" if len(filtered) == 1 else "resultados"}' if filtered else "Sem resultados"
-        st.html(f'<div class="result-count" role="status">{text}</div>')
-    if panel:
-        render_panel(panel, filtered, points, admin, features, coordinates)
+    if panel in ("Ficha", "Administração"):
+        render_panel(panel, filtered, points, admin, features)
 
 
 def main() -> None:
     st.html(ROOT / "ui.css")
+    st.html(ROOT / "marker_icons.css")
     admin = st.session_state.get("catalog-admin-mode", False)
-    render_navigation(admin)
+    render_brand(admin)
     try:
         features = load_catalog()
     except (OSError, json.JSONDecodeError, ValueError) as error:
@@ -873,24 +1043,24 @@ def main() -> None:
             for level, message in messages:
                 getattr(st, level)(message)
     available = [feature for feature in features if admin or feature["properties"].get("estado") != "rejeitado"]
+    filters_open = st.session_state.get("catalog-filters-open", False)
+    with st.container(key="hud_top", horizontal_alignment="center", gap="small"):
+        with st.container(key="hud_controls", horizontal=True, horizontal_alignment="center", gap="small"):
+            render_search()
+            st.button(
+                "Filtros", icon=":material/tune:", key="map-filters", on_click=toggle_filters,
+                type="primary" if filters_open else "secondary",
+            )
+            render_navigation(admin)
+        filtered = render_filters(available, admin, filters_open)
+    points = group_points(filtered)
+    render_map_legend(filtered)
+    render_view_controls(points, filtered, admin)
     if st.session_state.get("upload_open"):
         render_upload()
-    new_contribution = st.session_state.pop("new_contribution", None)
-    if new_contribution:
-        upload_id, position = new_contribution
-        clear_filters()
-        select_element(f"{upload_id}-1", position, move_map=True)
-    filtered, coordinates = render_toolbar(available, admin)
-    if coordinates != st.session_state.get("searched-coordinates"):
-        st.session_state["searched-coordinates"] = coordinates
-        if coordinates:
-            request_view(point=coordinates)
-            st.session_state["catalog-panel"] = "Resultados"
-    points = group_points(filtered)
-    if st.session_state.get("result-filter") != tuple(st.session_state.get(key) for key in FILTER_KEYS):
-        st.session_state["catalog-page"] = 0
-        st.session_state["result-filter"] = tuple(st.session_state.get(key) for key in FILTER_KEYS)
-    render_explorer(filtered, points, marker_data(points), map_bounds, admin, features, coordinates)
+    render_explorer(
+        filtered, points, marker_data(points), map_bounds, admin, features, st.session_state.get("search-marker"),
+    )
 
 
 if __name__ == "__main__":
