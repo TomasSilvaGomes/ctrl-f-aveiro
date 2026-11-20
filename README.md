@@ -98,7 +98,6 @@ dos recortes, a primeira corrida cria-a), `sfm/` (pontos 3D) e `viz/` (imagens).
 - Fotos enviadas ficam **por rever**; na Administração aprovam-se (entram no mapa e nas exportações) ou rejeitam-se.
 - As edições feitas na app ficam em `data/app/catalogo.geojson` e `contribuicoes.sqlite3`: voltar a correr
   `imagens.py app` refaz o catálogo da app (as edições no GeoJSON perdem-se).
-- Token da Mapillary (importar fotos pelo ID) só no `.env` do servidor.
 
 ## 5. Os scripts
 

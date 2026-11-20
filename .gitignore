@@ -36,4 +36,6 @@ data/referencias/recolha_web/
 
 # pesos descarregados automaticamente (ex.: CLIP ViT-B/32 do YOLO-World)
 /weights/
+/data/weights/
 *.md
+

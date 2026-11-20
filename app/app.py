@@ -31,7 +31,7 @@ from contributions import (
     MAX_UPLOAD_MB, PHOTO_CATEGORY, SOURCE, UPLOAD_TYPES, ContributionStore,
     PrivacyModelsMissing, decode_photo, photo_coordinates,
 )
-from mapillary_photos import PHOTO_LICENSE, MapillaryPhotoError, fetch_photo, image_key, mapillary_token, photo_link
+from mapillary_photos import image_key, mapillary_token, photo_link
 from photo_preview import (
     SAM2_MODEL, PhotoPreview, PreviewQueue, SegmentationError, catalog_photo_views, has_catalog_preview,
     load_catalog_preview,
@@ -187,58 +187,14 @@ def finish_submission(results, revision):
     st.rerun()
 
 
-def submit_photo(digest, data, coordinates, location_source, *, name, source, credit=None, panoramic=False):
-    # Todas as fotos (também as do Mapillary) passam pelo EgoBlur antes de se guardar seja o que for.
+def submit_photo(digest, data, coordinates, location_source, *, name):
     analyzer = get_analyzer()
     with decode_photo(data) as image:
-        detections = analyzer.analyze(image, panoramic=panoramic)
+        detections = analyzer.analyze(image)
         preview = None if detections else analyzer.preview_without_detections(image)
     return CONTRIBUTIONS.submit(
-        digest, *coordinates, location_source, detections, name=name, source=source, preview=preview, credit=credit,
+        digest, *coordinates, location_source, detections, name=name, source="ficheiro", preview=preview,
     )
-
-
-def import_mapillary_photo(key, token):
-    digest = f"mapillary:{key}"
-    if CONTRIBUTIONS.has_photo(digest):
-        return "info", "Esta fotografia do Mapillary já foi recebida."
-    photo = fetch_photo(key, token)
-    if photo.coordinates is None:
-        raise MapillaryPhotoError("A API não devolveu coordenadas para esta fotografia.")
-    credit = {
-        "imagem_id": key, "imagem_url": photo_link(key), "autor": photo.author, "licenca": PHOTO_LICENSE,
-    }
-    request_id = submit_photo(
-        digest, photo.data, photo.coordinates, "gps_mapillary",
-        name=f"Mapillary · {key}", source="mapillary", credit=credit, panoramic=photo.panoramic,
-    )
-    if request_id is None:
-        return "info", "Esta fotografia do Mapillary já foi recebida."
-    return "success", "Fotografia recebida."
-
-
-def render_mapillary_import(revision):
-    token = mapillary_token()
-    raw = st.text_input("Link ou ID da fotografia do Mapillary", key=f"mapillary-image-{revision}")
-    key = image_key(raw)
-    if not token:
-        st.caption("Configura MAPILLARY_TOKEN no ficheiro .env do servidor para importar fotografias.")
-    if raw and not key:
-        st.caption("Usa um ID numérico ou um link de fotografia com pKey.")
-    if not st.button(
-        "Enviar fotografia do Mapillary", icon=":material/add_a_photo:", type="primary",
-        width="stretch", disabled=not (token and key),
-    ):
-        return
-    with st.spinner("A obter a fotografia e a executar OWLv2, SigLIP e SAM 2…"):
-        try:
-            message = import_mapillary_photo(key, token)
-        except (PrivacyModelsMissing, SegmentationError, ValueError) as error:
-            message = ("error", str(error))
-        except Exception:
-            LOGGER.exception("Erro ao analisar uma fotografia do Mapillary")
-            message = ("error", "Não foi possível enviar a fotografia.")
-    finish_submission([message], revision)
 
 
 @st.dialog("Adicionar fotografias", width="large", on_dismiss=close_upload)
@@ -247,10 +203,6 @@ def render_upload():
     for message in st.session_state.get("upload_errors", []):
         st.error(message)
     revision = st.session_state.get("upload_revision", 0)
-    source = st.radio("Origem da fotografia", ["Ficheiros", "Mapillary"], horizontal=True, key="photo-source")
-    if source == "Mapillary":
-        render_mapillary_import(revision)
-        return
     files = st.file_uploader(
         "Fotografias de mobiliário urbano",
         type=UPLOAD_TYPES,
@@ -296,7 +248,7 @@ def render_upload():
             if CONTRIBUTIONS.has_photo(digest):
                 results.append(("info", f"{file.name} · Esta fotografia já foi enviada."))
                 continue
-            request_id = submit_photo(digest, data, coordinates, location_source, name=file.name, source="ficheiro")
+            request_id = submit_photo(digest, data, coordinates, location_source, name=file.name)
             if request_id:
                 results.append(("success", f"{file.name} · Fotografia recebida."))
             else:
