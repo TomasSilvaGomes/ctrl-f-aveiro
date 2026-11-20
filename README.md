@@ -64,8 +64,9 @@ $env:DATA_DIR = "data\video_rua"
 .\.venv\Scripts\python.exe scripts\dados.py poses --opensfm    # rotação + pontos 3D NOSSOS (OpenSfM em Docker, sem API)
 Remove-Item Env:DATA_DIR
 .\.venv\Scripts\python.exe scripts\pipeline.py --dados data\video_rua --triangulacao
-# imagens para a app: uma por elemento do catálogo, já desenhada (~30 s)
-.\.venv\Scripts\python.exe scripts\imagens.py app
+# imagens para a app: uma por elemento do catálogo, já desenhada, com a máscara SAM 2.1 small
+.\.venv\Scripts\python.exe scripts\posicao.py contorno --so-catalogo   # contornos de todas as vistas da app (~20 min; só os que faltam)
+.\.venv\Scripts\python.exe scripts\imagens.py app                      # ~30 s
 ```
 
 A imagem Docker do OpenSfM faz-se uma vez (Docker Desktop ligado):

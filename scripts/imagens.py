@@ -745,7 +745,7 @@ def cmd_app(args):
         return f"imagens/{nome}"
 
     def obj(cat, iid, b):
-        return {"bbox": b, "cat": cat, "poly": polys.get(key(iid, b)) if cat == "residuos" else None}
+        return {"bbox": b, "cat": cat, "poly": polys.get(key(iid, b))}   # máscara SAM 2 em todas as categorias
 
     alvos = []                                     # (dicionário a completar: elemento ou contentor)
     n_el = n_it = 0

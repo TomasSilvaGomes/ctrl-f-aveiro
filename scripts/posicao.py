@@ -56,6 +56,8 @@ from comum import DATA_DIR, limiares, limit_vram, perspective_view  # noqa: E402
 # Uso:
 #     python scripts/posicao.py contorno
 #     python scripts/posicao.py contorno --categorias iluminacao
+#     python scripts/posicao.py contorno --so-catalogo     # máscaras para a app: só as vistas do catálogo,
+#                                                          # todas as categorias, sem mexer nas deteções
 
 
 SAM_MODELOS = {t: f"facebook/sam2.1-hiera-{t}" for t in ("large", "base-plus", "small", "tiny")}   # Apache 2.0
@@ -225,8 +227,18 @@ def main_contorno(argv=None):
     ap.add_argument("--sam", choices=list(SAM_MODELOS) + ["mask2former"], default="small",
                     help="SAM 2 small (por omissão desde 19/11; o catálogo principal já foi feito com o large, "
                          "cache contorno_cache.jsonl) / large / base-plus / tiny, ou mask2former (só comparação)")
+    ap.add_argument("--so-catalogo", action="store_true",
+                    help="só as vistas que a app mostra (1 por elemento do catálogo + contentores das ilhas), de "
+                         "todas as categorias; guarda só os contornos (imagens.py app) e não mexe nas deteções")
     args = ap.parse_args(argv)
     cats = set(args.categorias.split(","))
+    vistas = None
+    if args.so_catalogo:
+        with open(DATA_DIR / "catalogo" / "catalogo.geojson", encoding="utf-8") as f:
+            feats = json.load(f)["features"]
+        vistas = {key({"image_id": v["imagem_id"], "bbox": v["imagem_bbox"]})
+                  for ft in feats for v in [ft["properties"], *(ft["properties"].get("itens") or ())]}
+        cats = {ft["properties"]["categoria"] for ft in feats}
     path = DATA_DIR / "preds" / f"{args.model}_classified.jsonl"
     cache_path = DATA_DIR / "preds" / ("contorno_cache.jsonl" if args.sam == "large" else f"contorno_cache_{args.sam}.jsonl")
     dets = [json.loads(ln) for ln in open(path, encoding="utf-8")]
@@ -240,6 +252,8 @@ def main_contorno(argv=None):
     todo = defaultdict(list)
     for d in dets:   # novos; e contentores feitos antes de se guardar o contorno ("poly"), que
         r = cache.get(key(d))   # se desenha nas imagens (na iluminação só contam o pé e os pontos 3D)
+        if vistas is not None and key(d) not in vistas:
+            continue
         if d["category"] in cats and (r is None or (d["category"] == "residuos" and "poly" not in r)):
             todo[d["image_id"]].append(d)
     n_todo = sum(len(v) for v in todo.values())
@@ -285,6 +299,12 @@ def main_contorno(argv=None):
         with open(cache_path, "w", encoding="utf-8") as fc:   # reescreve sem entradas repetidas
             for r in cache.values():
                 fc.write(json.dumps(r) + "\n")
+
+    if vistas is not None:
+        feitos = sum(1 for k in vistas if (cache.get(k) or {}).get("poly"))
+        print(f"Vistas do catálogo com contorno: {feitos}/{len(vistas)} -> {cache_path.name} "
+              f"(deteções intactas; a seguir: python scripts/imagens.py app)")
+        return
 
     n_base = n_d3 = 0
     with open(path, "w", encoding="utf-8") as fo:
